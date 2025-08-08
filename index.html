@@ -1,757 +1,117 @@
 <!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no" />
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#4F46E5">
-  <title>AR Geolokasi Explorer — Revisi</title>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Location-Based AR Android</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 
-  <!-- A-Frame modern -->
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <!-- AR.js (AR-js-org) -->
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.min.js"></script>
-  <!-- aframe look-at component -->
-  <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
-  <!-- PapaParse untuk CSV robust parsing -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <!-- Tailwind CDN (utilitas) -->
-  <script src="https://cdn.tailwindcss.com"></script>
+    <!-- A-Frame & AR.js v3 -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.min.js"></script>
 
-  <style>
-    :root {
-      --ui-z: 1000;
-    }
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-      background: #0f172a;
-      color: #fff;
-      -webkit-user-select: none;
-      user-select: none;
-      touch-action: manipulation;
-    }
+    <!-- Look-at component -->
+    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
-    /* A-Frame scene full-screen, optimized for portrait */
-    a-scene.ar-scene, a-scene.ar-scene canvas {
-      position: fixed !important;
-      inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      z-index: 1 !important;
-    }
+    <style>
+      body, html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: black;
+      }
+      #start-btn {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 15px 25px;
+        font-size: 18px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        z-index: 9999;
+      }
+      #status {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.6);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 14px;
+        z-index: 9999;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="start-btn">Mulai Jelajah</button>
+    <div id="status">Menunggu izin...</div>
 
-    .ui-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: var(--ui-z);
-      pointer-events: none;
-    }
-    .ui-overlay > * { pointer-events: auto; }
-
-    /* Top bar */
-    .topbar {
-      display: flex;
-      gap: 8px;
-      justify-content: space-between;
-      align-items: center;
-      padding: env(safe-area-inset-top) 12px 8px;
-      background: linear-gradient(180deg, rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.10));
-      backdrop-filter: blur(6px);
-    }
-
-    /* Bottom info */
-    .bottom-info {
-      position: absolute;
-      left: 8px;
-      right: 8px;
-      bottom: calc(12px + env(safe-area-inset-bottom));
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      pointer-events: auto;
-    }
-
-    .panel {
-      background: rgba(0,0,0,0.55);
-      padding: 10px 12px;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(2,6,23,0.6);
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .btn {
-      background: rgba(255,255,255,0.08);
-      padding: 8px 12px;
-      border-radius: 10px;
-      color: #fff;
-      font-weight: 600;
-      border: 1px solid rgba(255,255,255,0.06);
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .nav-overlay {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%,-50%);
-      z-index: calc(var(--ui-z) + 1);
-      pointer-events: none;
-      display: none;
-      text-align: center;
-    }
-
-    .nav-overlay.active { display: block; }
-
-    .direction-arrow {
-      width: clamp(64px, 18vw, 96px);
-      height: clamp(64px, 18vw, 96px);
-      border-radius: 999px;
-      display: grid;
-      place-items: center;
-      font-size: clamp(20px, 6vw, 36px);
-      transform: rotate(0deg);
-      transition: transform 200ms linear;
-      background: linear-gradient(135deg, #6366f1, #06b6d4);
-      box-shadow: 0 8px 30px rgba(99,102,241,0.25);
-    }
-
-    .compass {
-      position: absolute;
-      right: 12px;
-      top: calc(72px + env(safe-area-inset-top));
-      width: 54px;
-      height: 54px;
-      border-radius: 999px;
-      background: rgba(0,0,0,0.45);
-      display: grid;
-      place-items: center;
-      pointer-events: none;
-      z-index: calc(var(--ui-z) + 1);
-      font-weight: 700;
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .needle {
-      width: 2px;
-      height: 22px;
-      background: #ff5252;
-      transform-origin: bottom center;
-      transform: translateY(-6px) rotate(0deg);
-      transition: transform 200ms linear;
-    }
-
-    /* Help modal */
-    .modal-backdrop {
-      position: fixed; inset: 0; z-index: calc(var(--ui-z) + 2);
-      display: none; align-items:center; justify-content:center;
-      background: rgba(0,0,0,0.6);
-    }
-    .modal-backdrop.active { display:flex; }
-    .modal {
-      width: min(720px, 96vw);
-      max-height: 85vh;
-      overflow:auto;
-      background: white;
-      color: #0f172a;
-      border-radius: 12px;
-      padding: 16px;
-    }
-    .list-item { cursor: pointer; padding:10px; border-radius:8px; }
-    .list-item:hover { background: #f3f4f6; }
-
-    /* Small helpers */
-    .hidden { display: none; }
-    .center { display:flex; align-items:center; justify-content:center; }
-
-    /* Make UI comfortable in portrait: stack controls vertically on narrow screens */
-    @media (max-width:640px) {
-      .topbar { padding: env(safe-area-inset-top) 10px 6px; }
-      .panel { padding: 8px 10px; }
-      .btn { padding: 10px; font-size: 14px; }
-    }
-  </style>
-</head>
-<body>
-
-  <!-- HOME -->
-  <main id="home" class="center min-h-screen flex-col gap-6">
-    <div class="text-center p-6">
-      <h1 class="text-4xl font-bold mb-2">🌍 AR Explorer</h1>
-      <p class="text-sm opacity-80 mb-6">Jelajahi titik lokasi dengan AR geo-placement — support portrait mobile</p>
-      <div class="flex gap-3 justify-center">
-        <button id="startBtn" class="btn">🚀 Mulai Jelajah</button>
-        <button id="helpBtnHome" class="btn">❓ Daftar Lokasi</button>
-      </div>
-    </div>
-    <div class="text-xs opacity-60">Catatan: Buka lewat HTTPS / localhost agar kamera, lokasi, dan sensor bekerja.</div>
-  </main>
-
-  <!-- AR PAGE -->
-  <div id="app" class="hidden">
-    <!-- A-Frame scene -->
     <a-scene
-      class="ar-scene"
+      vr-mode-ui="enabled: false"
       embedded
-      vr-mode-ui="enabled:false"
+      arjs="sourceType: webcam; debugUIEnabled: false;"
       renderer="logarithmicDepthBuffer: true;"
-      loading-screen="enabled: false"
-      arjs="sourceType: webcam; debugUIEnabled: false;">
-      
-      <a-entity camera gps-camera rotation-reader id="gpsCam"></a-entity>
+      device-orientation-permission-ui="enabled: false"
+    >
+      <a-camera gps-camera rotation-reader></a-camera>
     </a-scene>
 
-    <!-- UI overlay -->
-    <div class="ui-overlay">
-      <div class="topbar">
-        <div style="display:flex;gap:8px;align-items:center">
-          <button id="backBtn" class="btn">← Kembali</button>
-          <div id="status" class="panel text-sm">Memuat lokasi...</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button id="listBtn" class="btn">📍 Lokasi</button>
-          <button id="recenterBtn" class="btn">🎯 Pusat</button>
-        </div>
-      </div>
+    <script>
+      const startBtn = document.getElementById("start-btn");
+      const statusBox = document.getElementById("status");
+      const scene = document.querySelector("a-scene");
 
-      <div class="nav-overlay" id="navOverlay">
-        <div class="direction-arrow" id="dirArrow">↑</div>
-        <div style="height:8px"></div>
-        <div class="panel" id="navInfo">
-          <div id="navTitle" style="font-weight:700">Tujuan</div>
-          <div id="navDist" style="font-size:13px;opacity:.85">—</div>
-          <div id="navDesc" style="font-size:12px;opacity:.7">—</div>
-        </div>
-      </div>
+      // Daftar objek contoh
+      const places = [
+        { name: "Monas", lat: -6.175392, lon: 106.827153 },
+        { name: "Bundaran HI", lat: -6.193056, lon: 106.820556 }
+      ];
 
-      <div class="compass" aria-hidden="true">
-        <div class="needle" id="needle"></div>
-        <div style="position:absolute;bottom:6px;font-size:11px">N</div>
-      </div>
-
-      <div class="bottom-info">
-        <div class="panel" id="nearestPanel">
-          <div style="text-align:left">
-            <div style="font-size:12px;opacity:.8">Objek terdekat</div>
-            <div id="nearestName" style="font-weight:700">—</div>
-            <div id="nearestDist" style="font-size:12px;opacity:.85">—</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- HELP / LIST modal -->
-  <div id="modal" class="modal-backdrop" role="dialog" aria-modal="true">
-    <div class="modal">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <h3 class="text-lg font-bold">📍 Objek Tersedia</h3>
-        <button id="closeModal" class="btn">✕</button>
-      </div>
-      <div id="objectList" class="space-y-2"></div>
-      <div style="height:12px"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button id="closeModal2" class="btn">Tutup</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Permission prompt for camera & orientation (lightweight) -->
-  <div id="permPrompt" class="modal-backdrop" style="z-index:1100;">
-    <div class="modal" style="max-width:420px; text-align:center;">
-      <h3 class="text-xl font-bold mb-2">🔐 Izin Diperlukan</h3>
-      <p class="mb-4">Agar AR berfungsi, izinkan akses Kamera, Lokasi, dan Arah (kompas). Di iOS, Safari akan menanyakan izin arah setelah kamu menekan tombol.</p>
-      <div style="display:flex;gap:8px;justify-content:center">
-        <button id="grantBtn" class="btn">Berikan Izin</button>
-        <button id="denyBtn" class="btn">Batal</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-  (function(){
-    // ------------- Config -------------
-    // CSV public URL (Google Sheets CSV PUB)
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCPrAyjTP4O7lSWJnouA4Ysnd5U88mcM-dWyJG0Nv9eWOA3yVKrGJ1-5G_QDdEcTNpwn0F5XbzeUJh/pub?gid=0&single=true&output=csv';
-
-    // Foursquare / other API keys (you said it's OK to keep front-end)
-    const FOURSQUARE_CLIENT_ID = 'WUD2DPDA5VDU2BXJC5NS4G1JUAPWTHZ4ZOB42JQUTPU1NIUT'; // still here if needed
-    const FOURSQUARE_CLIENT_SECRET = 'WZ4YKMWYVFTF0BV1I0YFTXFDUU5OMC00Q24EDRYUHQQI50ZG';
-
-    // show objects only within this distance (km)
-    const MAX_DISPLAY_KM = 5;
-
-    // ------------- State -------------
-    let arObjects = []; // {name,lat,lon,url}
-    let entityMap = new Map(); // name -> A-Frame entity
-    let userLocation = null;
-    let watchId = null;
-    let deviceHeading = 0;
-    let currentNav = null;
-    let gpsCamEl = null;
-    let appVisible = false;
-
-    // DOM
-    const home = document.getElementById('home');
-    const startBtn = document.getElementById('startBtn');
-    const helpBtnHome = document.getElementById('helpBtnHome');
-    const app = document.getElementById('app');
-    const status = document.getElementById('status');
-    const backBtn = document.getElementById('backBtn');
-    const listBtn = document.getElementById('listBtn');
-    const modal = document.getElementById('modal');
-    const objectList = document.getElementById('objectList');
-    const closeModal = document.getElementById('closeModal');
-    const closeModal2 = document.getElementById('closeModal2');
-    const permPrompt = document.getElementById('permPrompt');
-    const grantBtn = document.getElementById('grantBtn');
-    const denyBtn = document.getElementById('denyBtn');
-    const navOverlay = document.getElementById('navOverlay');
-    const dirArrow = document.getElementById('dirArrow');
-    const navTitle = document.getElementById('navTitle');
-    const navDist = document.getElementById('navDist');
-    const navDesc = document.getElementById('navDesc');
-    const nearestName = document.getElementById('nearestName');
-    const nearestDist = document.getElementById('nearestDist');
-    const needle = document.getElementById('needle');
-    const listBtnUi = document.getElementById('listBtn');
-    const recenterBtn = document.getElementById('recenterBtn');
-
-    // ------------- Helpers -------------
-    function kmToM(km) { return Math.round(km * 1000); }
-
-    function haversineKm(lat1, lon1, lat2, lon2) {
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI/180;
-      const dLon = (lon2 - lon1) * Math.PI/180;
-      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
-    }
-
-    function bearing(lat1, lon1, lat2, lon2) {
-      const φ1 = lat1 * Math.PI/180;
-      const φ2 = lat2 * Math.PI/180;
-      const λ1 = lon1 * Math.PI/180;
-      const λ2 = lon2 * Math.PI/180;
-      const y = Math.sin(λ2-λ1) * Math.cos(φ2);
-      const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
-      let θ = Math.atan2(y, x) * 180/Math.PI;
-      θ = (θ + 360) % 360;
-      return θ;
-    }
-
-    function relativeBearingToRotation(rel) {
-      // AR arrow rotation expects deg; we map so 0 = up
-      return rel;
-    }
-
-    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-
-    // ------------- CSV load -------------
-    async function loadCSV() {
-      try {
-        const res = await fetch(CSV_URL);
-        const text = await res.text();
-        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true });
-        const data = parsed.data.map(row => {
-          // Expect columns: name, lat, lon, url (case-insensitive)
-          const keys = Object.keys(row);
-          const nameKey = keys.find(k => k.toLowerCase().includes('name')) || keys[0];
-          const latKey = keys.find(k => k.toLowerCase().includes('lat'));
-          const lonKey = keys.find(k => k.toLowerCase().includes('lon'));
-          const urlKey = keys.find(k => k.toLowerCase().includes('url')) || keys.find(k => k.toLowerCase().includes('link'));
-          const name = row[nameKey] ? String(row[nameKey]).trim() : null;
-          const lat = latKey ? parseFloat(row[latKey]) : NaN;
-          const lon = lonKey ? parseFloat(row[lonKey]) : NaN;
-          const url = urlKey ? String(row[urlKey] || '').trim() : '';
-          if (name && !isNaN(lat) && !isNaN(lon)) return { name, lat, lon, url };
-          return null;
-        }).filter(Boolean);
-        if (data.length) {
-          arObjects = data;
-        } else {
-          // fallback
-          arObjects = [
-            { name: 'Monas', lat: -6.175392, lon: 106.827153, url: '' },
-            { name: 'Bundaran HI', lat: -6.194444, lon: 106.82278, url: '' }
-          ];
-        }
-      } catch (e) {
-        console.error('CSV load failed', e);
-        arObjects = [
-          { name: 'Monas', lat: -6.175392, lon: 106.827153, url: '' },
-          { name: 'Bundaran HI', lat: -6.194444, lon: 106.82278, url: '' }
-        ];
-      }
-      renderObjectList();
-    }
-
-    // ------------- Render object list in modal -------------
-    function renderObjectList() {
-      objectList.innerHTML = '';
-      if (!arObjects.length) {
-        objectList.innerHTML = '<div class="p-3">Tidak ada data.</div>';
-        return;
-      }
-      arObjects.forEach(obj => {
-        const d = document.createElement('div');
-        d.className = 'list-item';
-        d.innerHTML = `<div style="font-weight:700">${obj.name}</div><div style="font-size:13px;opacity:.7">Lat: ${obj.lat}, Lon: ${obj.lon}</div>`;
-        d.onclick = () => {
-          modal.classList.remove('active');
-          startNavigation(obj);
-        };
-        objectList.appendChild(d);
-      });
-    }
-
-    // ------------- AR entity management -------------
-    function ensureEntityFor(obj) {
-      // if exists, return entity; else create and return
-      if (entityMap.has(obj.name)) return entityMap.get(obj.name);
-      const textEnt = document.createElement('a-entity');
-      // We'll use a simple 3D billboard (a-plane with text texture using a-text)
-      // Simpler: use a-text with gps-entity-place
-      const aText = document.createElement('a-text');
-      aText.setAttribute('value', obj.name);
-      aText.setAttribute('align', 'center');
-      aText.setAttribute('look-at', '[gps-camera]');
-      aText.setAttribute('side', 'double');
-      aText.setAttribute('scale', '8 8 8'); // tweak for legibility
-      aText.setAttribute('gps-entity-place', `latitude: ${obj.lat}; longitude: ${obj.lon};`);
-      aText.setAttribute('color', '#ffffff');
-      aText.setAttribute('shader', 'msdf'); // if supported
-      textEnt.appendChild(aText);
-
-      // Add small ring/marker under text
-      const ring = document.createElement('a-ring');
-      ring.setAttribute('radius-inner', '0.2');
-      ring.setAttribute('radius-outer', '0.35');
-      ring.setAttribute('rotation', '-90 0 0');
-      ring.setAttribute('gps-entity-place', `latitude: ${obj.lat}; longitude: ${obj.lon};`);
-      ring.setAttribute('color', '#06b6d4');
-      ring.setAttribute('opacity', '0.9');
-
-      // container
-      const scene = document.querySelector('a-scene');
-      // append to scene (A-Frame needs top-level)
-      scene.appendChild(aText);
-      scene.appendChild(ring);
-
-      entityMap.set(obj.name, { text: aText, ring: ring, meta: obj });
-      return entityMap.get(obj.name);
-    }
-
-    function updateEntities() {
-      if (!userLocation) return;
-      // For each object, if within range show or update; else hide
-      arObjects.forEach(obj => {
-        const d = haversineKm(userLocation.lat, userLocation.lon, obj.lat, obj.lon);
-        if (d <= MAX_DISPLAY_KM) {
-          const ent = ensureEntityFor(obj);
-          // update text to include distance
-          ent.text.setAttribute('value', `${obj.name}\n${d.toFixed(2)} km`);
-          // scale based on distance (closer = larger)
-          const scaleFactor = clamp(1.8 + (MAX_DISPLAY_KM - d) / MAX_DISPLAY_KM * 3.0, 1.2, 6);
-          ent.text.setAttribute('scale', `${scaleFactor} ${scaleFactor} ${scaleFactor}`);
-          ent.text.setAttribute('visible', 'true');
-          ent.ring.setAttribute('visible', 'true');
-        } else {
-          // hide if previously created
-          if (entityMap.has(obj.name)) {
-            const ent = entityMap.get(obj.name);
-            ent.text.setAttribute('visible', 'false');
-            ent.ring.setAttribute('visible', 'false');
-          }
-        }
-      });
-    }
-
-    // ------------- Nearest object UI -------------
-    function updateNearest() {
-      if (!userLocation || !arObjects.length) return;
-      let min = Infinity;
-      let nearest = null;
-      arObjects.forEach(obj => {
-        const d = haversineKm(userLocation.lat, userLocation.lon, obj.lat, obj.lon);
-        if (d < min) { min = d; nearest = obj; }
-      });
-      if (nearest) {
-        nearestName.textContent = nearest.name;
-        nearestDist.textContent = `${(min*1000).toFixed(0)} m`;
-      }
-    }
-
-    // ------------- Navigation (simple) -------------
-    function startNavigation(obj) {
-      currentNav = obj;
-      navOverlay.classList.add('active');
-      updateNavigationUI();
-    }
-
-    function stopNavigation() {
-      currentNav = null;
-      navOverlay.classList.remove('active');
-    }
-
-    function updateNavigationUI() {
-      if (!currentNav || !userLocation) return;
-      const dKm = haversineKm(userLocation.lat, userLocation.lon, currentNav.lat, currentNav.lon);
-      const b = bearing(userLocation.lat, userLocation.lon, currentNav.lat, currentNav.lon);
-      // relative bearing = bearing - deviceHeading
-      const rel = ((b - deviceHeading) + 360) % 360;
-      dirArrow.style.transform = `rotate(${relativeBearingToRotation(rel)}deg)`;
-      navTitle.textContent = currentNav.name;
-      navDist.textContent = `${kmToM(dKm)} m`;
-      navDesc.textContent = getDirectionText(rel);
-      // Arrived threshold 30m
-      if (dKm <= 0.03) {
-        showArrival(currentNav);
-      }
-    }
-
-    function getDirectionText(relBearing) {
-      const nb = (relBearing + 360) % 360;
-      if (nb >= 337.5 || nb < 22.5) return 'Lurus ke depan';
-      if (nb >= 22.5 && nb < 67.5) return 'Belok kanan depan';
-      if (nb >= 67.5 && nb < 112.5) return 'Belok kanan';
-      if (nb >= 112.5 && nb < 157.5) return 'Belok kanan belakang';
-      if (nb >= 157.5 && nb < 202.5) return 'Putar balik';
-      if (nb >= 202.5 && nb < 247.5) return 'Belok kiri belakang';
-      if (nb >= 247.5 && nb < 292.5) return 'Belok kiri';
-      if (nb >= 292.5 && nb < 337.5) return 'Belok kiri depan';
-      return '';
-    }
-
-    function showArrival(obj) {
-      const toast = document.createElement('div');
-      toast.style.position = 'fixed';
-      toast.style.left = '50%';
-      toast.style.top = '40%';
-      toast.style.transform = 'translate(-50%,-50%)';
-      toast.style.zIndex = 1200;
-      toast.style.padding = '18px 20px';
-      toast.style.borderRadius = '12px';
-      toast.style.background = '#10b981';
-      toast.style.color = '#fff';
-      toast.style.fontWeight = '700';
-      toast.textContent = `🎉 Tiba di ${obj.name}`;
-      document.body.appendChild(toast);
-      setTimeout(()=>{ toast.remove(); }, 2500);
-      stopNavigation();
-    }
-
-    // ------------- Location & sensors -------------
-    async function startLocationTracking() {
-      if (!navigator.geolocation) {
-        status.textContent = 'Geolocation tidak tersedia';
-        return;
-      }
-      // get current position first
-      navigator.geolocation.getCurrentPosition(pos => {
-        userLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        status.textContent = `📍 ${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
-        updateEntities();
-        updateNearest();
-      }, err => {
-        console.warn(err);
-        status.textContent = `❌ Error lokasi: ${err.message}`;
-      }, { enableHighAccuracy: true, timeout: 10000 });
-
-      // watch
-      watchId = navigator.geolocation.watchPosition(pos => {
-        userLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        status.textContent = `📍 ${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
-        updateEntities();
-        updateNearest();
-        if (currentNav) updateNavigationUI();
-      }, err => {
-        console.warn('watch error', err);
-      }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
-    }
-
-    function stopLocationTracking() {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-      }
-    }
-
-    function startOrientationTracking() {
-      // DeviceOrientationEvent on mobile: use absolute alpha as heading fallback
-      if (window.DeviceOrientationEvent) {
-        window.addEventListener('deviceorientationabsolute' , handleOrientation, true);
-        window.addEventListener('deviceorientation' , handleOrientation, true);
-      } else {
-        console.warn('Device orientation not supported');
-      }
-    }
-
-    function handleOrientation(e) {
-      // prefer absolute
-      let alpha = e.alpha;
-      if (alpha === null && e.webkitCompassHeading !== undefined) {
-        // iOS Safari legacy
-        deviceHeading = e.webkitCompassHeading;
-      } else if (alpha !== null) {
-        // alpha: 0..360 where 0 = device facing north? convert to compass heading
-        deviceHeading = (360 - alpha) % 360;
-      }
-      // update UI needle
-      needle.style.transform = `translateY(-6px) rotate(${deviceHeading}deg)`;
-      if (currentNav) updateNavigationUI();
-    }
-
-    async function requestCameraAccess() {
-      // request camera access once to warm-up; stop tracks immediately
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-          audio: false
-        });
-        stream.getTracks().forEach(t => t.stop());
-        return true;
-      } catch (e) {
-        console.warn('camera denied', e);
-        throw e;
-      }
-    }
-
-    // iOS DeviceOrientation permission (must be via user gesture)
-    async function requestOrientationPermissionIfNeeded() {
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          const perm = await DeviceOrientationEvent.requestPermission();
-          if (perm !== 'granted') throw new Error('orient permission denied');
-        } catch (e) {
-          console.warn('orientation permission error', e);
-          throw e;
-        }
-      }
-      return true;
-    }
-
-    // ------------- Init scene & controls -------------
-    function prepareScene() {
-      gpsCamEl = document.getElementById('gpsCam');
-      // Wait until scene loaded
-      const scene = document.querySelector('a-scene');
-      if (scene.hasLoaded) {
-        // nothing special now
-      } else {
-        scene.addEventListener('loaded', () => {
-          console.log('A-Frame scene loaded');
+      function addPlacesToScene() {
+        places.forEach((place) => {
+          const text = document.createElement("a-text");
+          text.setAttribute("value", place.name);
+          text.setAttribute("look-at", "[gps-camera]");
+          text.setAttribute("scale", "10 10 10");
+          text.setAttribute("align", "center");
+          text.setAttribute("gps-entity-place", `latitude: ${place.lat}; longitude: ${place.lon}`);
+          scene.appendChild(text);
         });
       }
-    }
 
-    // ------------- Lifecycle -------------
-    async function beginExperience() {
-      // show permission prompt
-      permPrompt.classList.add('active');
-    }
+      function requestPermissionsAndStart() {
+        // Android Chrome: minta izin geolokasi
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              statusBox.innerText = "Lokasi diterima. Menampilkan AR...";
+              addPlacesToScene();
+              startBtn.style.display = "none";
+            },
+            (err) => {
+              if (err.code === err.PERMISSION_DENIED) {
+                statusBox.innerText = "Izin lokasi dibutuhkan!";
+              } else {
+                statusBox.innerText = "Gagal mendapatkan lokasi.";
+              }
+            },
+            { enableHighAccuracy: true, timeout: 15000 }
+          );
+        } else {
+          statusBox.innerText = "Browser tidak mendukung GPS.";
+        }
 
-    // Called after user pressed grant in prompt
-    async function onGrantPermissions() {
-      permPrompt.classList.remove('active');
-
-      try {
-        await requestCameraAccess();            // camera
-      } catch (e) {
-        alert('Izin kamera ditolak. AR tidak bisa berjalan tanpa akses kamera.');
-        return;
+        // Kompas: Android biasanya langsung jalan, tapi kita pastikan event listener aktif
+        if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+          // iOS only, Android skip
+          DeviceOrientationEvent.requestPermission().catch(console.warn);
+        }
       }
 
-      try {
-        await requestOrientationPermissionIfNeeded(); // orientation (iOS)
-      } catch (e) {
-        // continue anyway -- compass may be unavailable
-        console.warn('orientation permission not granted; compass may be unreliable.');
-      }
-
-      // swap views: show AR page
-      home.classList.add('hidden');
-      app.classList.remove('hidden');
-      appVisible = true;
-
-      // start location & sensors
-      startLocationTracking();
-      startOrientationTracking();
-
-      // ensure scene ready & load entities
-      prepareScene();
-      // update entities repeatedly (in case user moves) -- light throttle via setInterval
-      setInterval(()=>{ updateEntities(); updateNearest(); if (currentNav) updateNavigationUI(); }, 1200);
-    }
-
-    // ------------- Event bindings -------------
-    startBtn.addEventListener('click', () => {
-      beginExperience();
-    });
-
-    helpBtnHome.addEventListener('click', () => { loadCSV().then(()=> modal.classList.add('active')); });
-    listBtn.addEventListener('click', () => { loadCSV().then(()=> modal.classList.add('active')); });
-
-    closeModal.addEventListener('click', ()=> modal.classList.remove('active'));
-    closeModal2.addEventListener('click', ()=> modal.classList.remove('active'));
-
-    grantBtn.addEventListener('click', async () => {
-      try {
-        await loadCSV(); // preload CSV before granting
-      } catch(e){}
-      onGrantPermissions();
-    });
-    denyBtn.addEventListener('click', ()=> {
-      permPrompt.classList.remove('active');
-    });
-
-    backBtn.addEventListener('click', ()=> {
-      // stop sensors
-      stopLocationTracking();
-      app.classList.add('hidden');
-      home.classList.remove('hidden');
-      appVisible = false;
-    });
-
-    listBtnUi.addEventListener('click', ()=> modal.classList.add('active'));
-
-    recenterBtn.addEventListener('click', ()=> {
-      // when recenter, simply refresh entity positions (gps-camera will re-evaluate)
-      if (userLocation) updateEntities();
-    });
-
-    // Handle page visibility changes
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        stopLocationTracking();
-      } else {
-        if (appVisible) startLocationTracking();
-      }
-    });
-
-    // Keyboard escape to close
-    window.addEventListener('keydown', (e)=> {
-      if (e.key === 'Escape') {
-        if (modal.classList.contains('active')) modal.classList.remove('active');
-      }
-    });
-
-    // Init: preload CSV for better UX
-    document.addEventListener('DOMContentLoaded', ()=> {
-      // Preload CSV but do not block UI
-      loadCSV().catch(()=>{});
-    });
-  })();
-  </script>
-
-</body>
+      startBtn.addEventListener("click", requestPermissionsAndStart);
+    </script>
+  </body>
 </html>
