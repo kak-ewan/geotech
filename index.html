@@ -1,18 +1,51 @@
-
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>AR Geolokasi Explorer</title>
     <script src="https://aframe.io/releases/0.9.2/aframe.min.js"></script>
     <script src="https://raw.githack.com/jeromeetienne/AR.js/master/aframe/build/aframe-ar.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { margin: 0; font-family: 'Inter', sans-serif; }
-        .ar-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        .ui-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+        * { box-sizing: border-box; }
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: 'Inter', sans-serif; 
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        .ar-scene { 
+            position: fixed !important; 
+            top: 0 !important; 
+            left: 0 !important; 
+            width: 100vw !important; 
+            height: 100vh !important;
+            height: 100dvh !important;
+            z-index: 1 !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .ui-overlay { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 100vh;
+            height: 100dvh;
+            z-index: 10; 
+            pointer-events: none; 
+        }
         .ui-overlay > * { pointer-events: auto; }
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .ar-object { 
@@ -24,6 +57,83 @@
             transform: translate(-50%, -50%);
             max-width: 200px;
             text-align: center;
+        }
+        .navigation-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 15;
+            pointer-events: none;
+        }
+        .direction-arrow {
+            width: clamp(60px, 15vw, 80px);
+            height: clamp(60px, 15vw, 80px);
+            background: linear-gradient(135deg, #4285f4, #34a853);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 32px rgba(66, 133, 244, 0.4);
+            transition: transform 0.3s ease;
+        }
+        .direction-arrow::before {
+            content: '↑';
+            font-size: 32px;
+            color: white;
+            font-weight: bold;
+        }
+        .navigation-info {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: clamp(8px, 3vw, 12px) clamp(12px, 5vw, 20px);
+            border-radius: 25px;
+            margin-top: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            font-size: clamp(12px, 3.5vw, 16px);
+            max-width: 90vw;
+        }
+        .pulse-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 120px;
+            height: 120px;
+            border: 3px solid #4285f4;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            opacity: 0.6;
+        }
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.8; }
+            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.4; }
+            100% { transform: translate(-50%, -50%) scale(1.3); opacity: 0; }
+        }
+        .compass-ring {
+            position: fixed;
+            top: clamp(80px, 20vh, 100px);
+            right: clamp(10px, 4vw, 20px);
+            width: clamp(45px, 12vw, 60px);
+            height: clamp(45px, 12vw, 60px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            z-index: 12;
+            font-size: clamp(8px, 2.5vw, 12px);
+        }
+        .compass-needle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 20px;
+            background: #ff4444;
+            transform-origin: bottom center;
+            transform: translate(-50%, -100%);
+            transition: transform 0.3s ease;
         }
         .loading-spinner {
             border: 3px solid #f3f3f3;
@@ -77,41 +187,74 @@
         <!-- UI Overlay -->
         <div class="ui-overlay">
             <!-- Header Controls -->
-            <div class="flex justify-between items-center p-4">
-                <button id="backBtn" class="bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70 transition-all">
-                    ← Kembali
+            <div class="flex justify-between items-center p-2 sm:p-4 safe-area-inset-top">
+                <button id="backBtn" class="bg-black bg-opacity-50 text-white p-2 sm:p-3 rounded-full hover:bg-opacity-70 transition-all text-sm sm:text-base min-h-[44px] min-w-[44px] flex items-center justify-center">
+                    <span class="hidden sm:inline">← Kembali</span>
+                    <span class="sm:hidden">←</span>
                 </button>
-                <button id="helpBtn" class="bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70 transition-all">
-                    ❓ Bantuan
+                <button id="helpBtn" class="bg-black bg-opacity-50 text-white p-2 sm:p-3 rounded-full hover:bg-opacity-70 transition-all text-sm sm:text-base min-h-[44px] min-w-[44px] flex items-center justify-center">
+                    <span class="hidden sm:inline">❓ Bantuan</span>
+                    <span class="sm:hidden">❓</span>
                 </button>
             </div>
 
             <!-- Status Info -->
-            <div id="statusInfo" class="absolute top-20 left-4 bg-black bg-opacity-50 text-white p-3 rounded-lg">
+            <div id="statusInfo" class="absolute top-16 sm:top-20 left-2 sm:left-4 right-2 sm:right-auto bg-black bg-opacity-50 text-white p-2 sm:p-3 rounded-lg text-sm sm:text-base max-w-xs">
                 <div class="flex items-center space-x-2">
                     <div class="loading-spinner"></div>
-                    <span>Memuat lokasi...</span>
+                    <span class="truncate">Memuat lokasi...</span>
                 </div>
             </div>
 
             <!-- Distance Info -->
-            <div id="distanceInfo" class="absolute bottom-20 left-4 right-4 bg-black bg-opacity-50 text-white p-3 rounded-lg hidden">
+            <div id="distanceInfo" class="absolute bottom-16 sm:bottom-20 left-2 sm:left-4 right-2 sm:right-4 bg-black bg-opacity-50 text-white p-2 sm:p-3 rounded-lg hidden safe-area-inset-bottom">
                 <div class="text-center">
-                    <div class="text-sm opacity-75">Objek terdekat:</div>
-                    <div id="nearestObject" class="font-semibold"></div>
-                    <div id="nearestDistance" class="text-sm"></div>
+                    <div class="text-xs sm:text-sm opacity-75">Objek terdekat:</div>
+                    <div id="nearestObject" class="font-semibold text-sm sm:text-base truncate"></div>
+                    <div id="nearestDistance" class="text-xs sm:text-sm"></div>
+                </div>
+            </div>
+
+            <!-- Navigation Overlay -->
+            <div id="navigationOverlay" class="navigation-overlay hidden">
+                <div class="pulse-ring"></div>
+                <div id="directionArrow" class="direction-arrow"></div>
+                <div class="navigation-info">
+                    <div id="navDestination" class="font-semibold text-lg"></div>
+                    <div id="navDistance" class="text-sm opacity-75"></div>
+                    <div id="navDirection" class="text-xs mt-1"></div>
+                </div>
+            </div>
+
+            <!-- Compass -->
+            <div class="compass-ring">
+                <div id="compassNeedle" class="compass-needle"></div>
+                <div class="absolute inset-0 flex items-center justify-center text-white text-xs font-bold">N</div>
+            </div>
+
+            <!-- Navigation Controls -->
+            <div id="navControls" class="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 right-2 sm:right-4 hidden safe-area-inset-bottom">
+                <div class="flex justify-center space-x-2 sm:space-x-4">
+                    <button id="stopNavBtn" class="bg-red-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-full hover:bg-red-600 transition-colors text-sm sm:text-base min-h-[44px] flex items-center">
+                        <span class="hidden sm:inline">🛑 Berhenti</span>
+                        <span class="sm:hidden">🛑</span>
+                    </button>
+                    <button id="recenterBtn" class="bg-blue-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-full hover:bg-blue-600 transition-colors text-sm sm:text-base min-h-[44px] flex items-center">
+                        <span class="hidden sm:inline">🎯 Pusatkan</span>
+                        <span class="sm:hidden">🎯</span>
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Modal Bantuan -->
-    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg max-w-md w-full max-h-96 overflow-y-auto">
-            <div class="p-6">
+    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-white rounded-lg max-w-md w-full max-h-[80vh] sm:max-h-96 overflow-y-auto mx-2">
+            <div class="p-4 sm:p-6">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold">📍 Objek Tersedia</h3>
-                    <button id="closeHelpBtn" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                    <h3 class="text-lg sm:text-xl font-bold">📍 Objek Tersedia</h3>
+                    <button id="closeHelpBtn" class="text-gray-500 hover:text-gray-700 text-2xl min-h-[44px] min-w-[44px] flex items-center justify-center">×</button>
                 </div>
                 <div id="objectList" class="space-y-3">
                     <!-- Akan diisi dengan JavaScript -->
@@ -121,15 +264,15 @@
     </div>
 
     <!-- Modal Izin -->
-    <div id="permissionModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg max-w-md w-full p-6 text-center">
-            <h3 class="text-xl font-bold mb-4">🔐 Izin Diperlukan</h3>
-            <p class="text-gray-600 mb-6">Aplikasi memerlukan akses kamera dan lokasi untuk fitur AR</p>
+    <div id="permissionModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-white rounded-lg max-w-md w-full p-4 sm:p-6 text-center mx-2">
+            <h3 class="text-lg sm:text-xl font-bold mb-4">🔐 Izin Diperlukan</h3>
+            <p class="text-gray-600 mb-6 text-sm sm:text-base">Aplikasi memerlukan akses kamera dan lokasi untuk fitur AR</p>
             <div class="space-y-3">
-                <button id="grantPermissionBtn" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors">
+                <button id="grantPermissionBtn" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors min-h-[44px] text-sm sm:text-base">
                     Berikan Izin
                 </button>
-                <button id="cancelPermissionBtn" class="w-full bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition-colors">
+                <button id="cancelPermissionBtn" class="w-full bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition-colors min-h-[44px] text-sm sm:text-base">
                     Batal
                 </button>
             </div>
@@ -143,6 +286,9 @@
         let watchId = null;
         let arScene = null;
         let arCamera = null;
+        let currentNavigation = null;
+        let deviceOrientation = 0;
+        let compassHeading = 0;
 
         // Foursquare API credentials
         const FOURSQUARE_CLIENT_ID = 'WUD2DPDA5VDU2BXJC5NS4G1JUAPWTHZ4ZOB42JQUTPU1NIUT';
@@ -212,10 +358,10 @@
             objectList.innerHTML = '';
             arObjects.forEach((obj, index) => {
                 const div = document.createElement('div');
-                div.className = 'p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors';
+                div.className = 'p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors min-h-[44px] flex flex-col justify-center';
                 div.innerHTML = `
-                    <div class="font-semibold">${obj.name}</div>
-                    <div class="text-sm text-gray-600">Lat: ${obj.lat.toFixed(4)}, Lon: ${obj.lon.toFixed(4)}</div>
+                    <div class="font-semibold text-sm sm:text-base truncate">${obj.name}</div>
+                    <div class="text-xs sm:text-sm text-gray-600 truncate">Lat: ${obj.lat.toFixed(4)}, Lon: ${obj.lon.toFixed(4)}</div>
                 `;
                 div.onclick = () => navigateToObject(obj);
                 objectList.appendChild(div);
@@ -226,9 +372,106 @@
         function navigateToObject(obj) {
             helpModal.classList.add('hidden');
             if (userLocation) {
-                const distance = calculateDistance(userLocation.lat, userLocation.lon, obj.lat, obj.lon);
-                alert(`Navigasi ke ${obj.name}\nJarak: ${distance.toFixed(2)} km\n\nDalam implementasi nyata, ini akan membuka aplikasi navigasi.`);
+                currentNavigation = obj;
+                startNavigation();
             }
+        }
+
+        // Start navigation
+        function startNavigation() {
+            if (!currentNavigation || !userLocation) return;
+
+            const navigationOverlay = document.getElementById('navigationOverlay');
+            const navControls = document.getElementById('navControls');
+            const distanceInfo = document.getElementById('distanceInfo');
+            
+            navigationOverlay.classList.remove('hidden');
+            navControls.classList.remove('hidden');
+            distanceInfo.classList.add('hidden');
+            
+            updateNavigationDisplay();
+        }
+
+        // Stop navigation
+        function stopNavigation() {
+            currentNavigation = null;
+            const navigationOverlay = document.getElementById('navigationOverlay');
+            const navControls = document.getElementById('navControls');
+            const distanceInfo = document.getElementById('distanceInfo');
+            
+            navigationOverlay.classList.add('hidden');
+            navControls.classList.add('hidden');
+            distanceInfo.classList.remove('hidden');
+        }
+
+        // Update navigation display
+        function updateNavigationDisplay() {
+            if (!currentNavigation || !userLocation) return;
+
+            const distance = calculateDistance(userLocation.lat, userLocation.lon, currentNavigation.lat, currentNavigation.lon);
+            const bearing = calculateBearing(userLocation.lat, userLocation.lon, currentNavigation.lat, currentNavigation.lon);
+            
+            // Update navigation info
+            document.getElementById('navDestination').textContent = currentNavigation.name;
+            document.getElementById('navDistance').textContent = `${(distance * 1000).toFixed(0)} meter`;
+            
+            // Update direction arrow
+            const directionArrow = document.getElementById('directionArrow');
+            const relativeBearing = bearing - deviceOrientation;
+            directionArrow.style.transform = `rotate(${relativeBearing}deg)`;
+            
+            // Update direction text
+            const directionText = getDirectionText(relativeBearing);
+            document.getElementById('navDirection').textContent = directionText;
+            
+            // Check if arrived
+            if (distance < 0.05) { // 50 meters
+                showArrivalNotification();
+            }
+        }
+
+        // Calculate bearing between two points
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const lat1Rad = lat1 * Math.PI / 180;
+            const lat2Rad = lat2 * Math.PI / 180;
+            
+            const y = Math.sin(dLon) * Math.cos(lat2Rad);
+            const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+            
+            let bearing = Math.atan2(y, x) * 180 / Math.PI;
+            return (bearing + 360) % 360;
+        }
+
+        // Get direction text
+        function getDirectionText(bearing) {
+            const normalizedBearing = ((bearing % 360) + 360) % 360;
+            
+            if (normalizedBearing >= 337.5 || normalizedBearing < 22.5) return "Lurus ke depan";
+            if (normalizedBearing >= 22.5 && normalizedBearing < 67.5) return "Belok kanan depan";
+            if (normalizedBearing >= 67.5 && normalizedBearing < 112.5) return "Belok kanan";
+            if (normalizedBearing >= 112.5 && normalizedBearing < 157.5) return "Belok kanan belakang";
+            if (normalizedBearing >= 157.5 && normalizedBearing < 202.5) return "Putar balik";
+            if (normalizedBearing >= 202.5 && normalizedBearing < 247.5) return "Belok kiri belakang";
+            if (normalizedBearing >= 247.5 && normalizedBearing < 292.5) return "Belok kiri";
+            if (normalizedBearing >= 292.5 && normalizedBearing < 337.5) return "Belok kiri depan";
+        }
+
+        // Show arrival notification
+        function showArrivalNotification() {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-green-500 text-white p-6 rounded-lg z-50 text-center';
+            notification.innerHTML = `
+                <div class="text-2xl mb-2">🎉</div>
+                <div class="font-bold text-lg">Tiba di Tujuan!</div>
+                <div class="text-sm">${currentNavigation.name}</div>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+                stopNavigation();
+            }, 3000);
         }
 
         // Calculate distance between two points
@@ -246,8 +489,16 @@
         // Request permissions
         async function requestPermissions() {
             try {
-                // Request camera permission
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                // Request camera permission with mobile optimization
+                const constraints = {
+                    video: {
+                        facingMode: 'environment', // Use back camera
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        frameRate: { ideal: 30 }
+                    }
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 stream.getTracks().forEach(track => track.stop());
 
                 // Request location permission
@@ -284,6 +535,9 @@
                         };
                         updateARObjects();
                         updateNearestObject();
+                        if (currentNavigation) {
+                            updateNavigationDisplay();
+                        }
                         statusInfo.innerHTML = `
                             <div class="text-green-400">
                                 📍 Lokasi: ${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}
@@ -300,6 +554,50 @@
                     },
                     { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 }
                 );
+            }
+        }
+
+        // Start device orientation tracking
+        function startOrientationTracking() {
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', (event) => {
+                    // Get compass heading
+                    let heading = event.alpha;
+                    if (heading !== null) {
+                        // Convert to 0-360 range
+                        compassHeading = (360 - heading) % 360;
+                        deviceOrientation = compassHeading;
+                        
+                        // Update compass needle
+                        const compassNeedle = document.getElementById('compassNeedle');
+                        if (compassNeedle) {
+                            compassNeedle.style.transform = `translate(-50%, -100%) rotate(${compassHeading}deg)`;
+                        }
+                        
+                        // Update navigation if active
+                        if (currentNavigation) {
+                            updateNavigationDisplay();
+                        }
+                    }
+                });
+            } else {
+                console.log('Device orientation not supported');
+            }
+        }
+
+        // Request device orientation permission (iOS 13+)
+        async function requestOrientationPermission() {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission === 'granted') {
+                        startOrientationTracking();
+                    }
+                } catch (error) {
+                    console.error('Orientation permission error:', error);
+                }
+            } else {
+                startOrientationTracking();
             }
         }
 
@@ -363,6 +661,7 @@
             arScene.addEventListener('loaded', () => {
                 console.log('AR Scene loaded');
                 startLocationTracking();
+                requestOrientationPermission();
             });
         }
 
@@ -416,6 +715,17 @@
             helpModal.classList.add('hidden');
         });
 
+        // Navigation control events
+        document.getElementById('stopNavBtn').addEventListener('click', () => {
+            stopNavigation();
+        });
+
+        document.getElementById('recenterBtn').addEventListener('click', () => {
+            if (currentNavigation) {
+                updateNavigationDisplay();
+            }
+        });
+
         // Close modals when clicking outside
         helpModal.addEventListener('click', (e) => {
             if (e.target === helpModal) {
@@ -443,5 +753,5 @@
             }
         });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96be1fcdf27ab5a6',t:'MTc1NDY0Njc4MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96be2f20b23bccfd',t:'MTc1NDY0NzQwOS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
