@@ -652,62 +652,7 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
             overflow: hidden;
         }
-        .placement-controls {
-            position: absolute;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 15px 20px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-        }
-        .placement-button {
-            background-color: #10b981;
-            color: white;
-            border: none;
-            border-radius: 25px;
-            padding: 12px 24px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-        }
-        .placement-button:hover {
-            background-color: #059669;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-        }
-        .placement-button:disabled {
-            background-color: #9ca3af;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-        .cancel-placement {
-            background-color: #ef4444;
-            color: white;
-            border: none;
-            border-radius: 20px;
-            padding: 8px 16px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .cancel-placement:hover {
-            background-color: #dc2626;
-        }
-        .placement-instructions {
-            text-align: center;
-            font-size: 14px;
-            color: #374151;
-            margin-bottom: 5px;
-        }
+
         .ar-view-mode-toggle {
             position: absolute;
             bottom: 20px;
@@ -829,12 +774,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </div>
-                        <div class="control-button" onclick="showPlaceMenu()">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                        </div>
+
                     </div>
                     
                     <!-- Compass - moved below back button -->
@@ -865,18 +805,7 @@
                         <span id="ar-view-mode-text">Tampilan AR: Dunia Nyata</span>
                     </div>
                     
-                    <!-- Placement Controls -->
-                    <div id="placement-controls" class="placement-controls hidden">
-                        <div class="placement-instructions">
-                            Arahkan kamera ke lokasi yang diinginkan
-                        </div>
-                        <button id="place-object-btn" class="placement-button">
-                            Taruh Objek di Sini
-                        </button>
-                        <button id="cancel-placement-btn" class="cancel-placement">
-                            Batal
-                        </button>
-                    </div>
+
                 </div>
                 
                 <!-- Calibration button -->
@@ -904,13 +833,7 @@
                     </svg>
                 </div>
                 
-                <!-- Place button -->
-                <div class="place-button" onclick="showPlaceMenu()">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                </div>
+
                 
                 <!-- Location button -->
                 <div class="location-button" id="student-use-current-location">
@@ -941,35 +864,7 @@
                 </div>
             </div>
             
-            <!-- Place Menu Modal -->
-            <div id="place-menu-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                <div class="coordinate-display">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold text-gray-900">Koordinat Lokasi Saat Ini</h3>
-                        <button onclick="hidePlaceMenu()" class="text-gray-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    
-                    <div class="space-y-2" id="coordinate-list">
-                        <div class="text-center py-8 text-gray-500">
-                            Mendapatkan lokasi...
-                        </div>
-                    </div>
-                    
-                    <div class="mt-4 p-3 bg-blue-50 rounded-lg">
-                        <p class="text-sm text-blue-800">
-                            <strong>Cara menggunakan:</strong><br>
-                            1. Berdiri di lokasi yang ingin dijadikan titik AR<br>
-                            2. Klik tombol "Salin" pada koordinat yang diinginkan<br>
-                            3. Tempel koordinat tersebut ke spreadsheet Anda<br>
-                            4. Format: nama, lat, lon, url
-                        </p>
-                    </div>
-                </div>
-            </div>
+
             
             <!-- Compass Calibration Modal -->
             <div id="calibration-overlay" class="hidden calibration-overlay">
@@ -1018,10 +913,7 @@
         let currentPresentationState = {}; // Store current slide index for presentations
         let openedBoxes = new Set(); // Track which boxes have been opened
         let boxOpenDistance = 15; // Distance in meters to allow box opening
-        let worldAnchoredObjects = new Map(); // Track objects placed in real world positions
-        let placedObjectsData = new Map(); // Store placed object data for persistence
-        let placementMode = false; // Track if we're in object placement mode
-        let pendingPlacement = null; // Store content waiting to be placed
+
 
         // Initialize the application
         function initApp() {
@@ -1069,6 +961,7 @@
                 const latIndex = headers.findIndex(h => h.includes('lat'));
                 const lonIndex = headers.findIndex(h => h.includes('lon') || h.includes('lng'));
                 const urlIndex = headers.findIndex(h => h.includes('url'));
+                const descIndex = urlIndex + 1; // Description is after URL column
                 
                 if (nameIndex === -1 || latIndex === -1 || lonIndex === -1 || urlIndex === -1) {
                     throw new Error('Kolom yang diperlukan tidak ditemukan dalam CSV. Diharapkan: name, lat, lon, url');
@@ -1086,6 +979,7 @@
                         const lat = parseFloat(row[latIndex]);
                         const lon = parseFloat(row[lonIndex]);
                         const url = row[urlIndex];
+                        const description = row[descIndex] || ''; // Get description from column after URL
                         
                         // Validate data
                         if (name && !isNaN(lat) && !isNaN(lon) && url) {
@@ -1110,6 +1004,7 @@
                                 title: name,
                                 type: contentType,
                                 content: processedContent,
+                                description: description, // Add description field
                                 lat: lat,
                                 lng: lon,
                                 radius: 50, // default radius
@@ -1281,13 +1176,9 @@
             // Load AR contents and opened boxes
             loadARContents();
             loadOpenedBoxes();
-            loadPlacedObjects();
             
             // Start AR rendering loop
             startARRenderingLoop();
-            
-            // Initialize placement controls
-            initializePlacementControls();
         }
 
         // Start camera
@@ -1420,90 +1311,7 @@
             }
         }
 
-        // Show place menu
-        function showPlaceMenu() {
-            document.getElementById('place-menu-modal').classList.remove('hidden');
-            updateCoordinateDisplay();
-        }
 
-        // Hide place menu
-        function hidePlaceMenu() {
-            document.getElementById('place-menu-modal').classList.add('hidden');
-        }
-
-        // Update coordinate display
-        function updateCoordinateDisplay() {
-            const coordinateList = document.getElementById('coordinate-list');
-            
-            if (!currentPosition) {
-                coordinateList.innerHTML = `
-                    <div class="text-center py-8 text-gray-500">
-                        Mendapatkan lokasi...
-                    </div>
-                `;
-                return;
-            }
-            
-            const lat = currentPosition.lat;
-            const lng = currentPosition.lng;
-            const accuracy = currentPosition.accuracy;
-            
-            coordinateList.innerHTML = `
-                <div class="coordinate-item">
-                    <div>
-                        <strong>Latitude:</strong><br>
-                        <span class="text-sm text-gray-600">${lat.toFixed(6)}</span>
-                    </div>
-                    <button class="copy-button" onclick="copyToClipboard('${lat.toFixed(6)}', this)">Salin</button>
-                </div>
-                
-                <div class="coordinate-item">
-                    <div>
-                        <strong>Longitude:</strong><br>
-                        <span class="text-sm text-gray-600">${lng.toFixed(6)}</span>
-                    </div>
-                    <button class="copy-button" onclick="copyToClipboard('${lng.toFixed(6)}', this)">Salin</button>
-                </div>
-                
-                <div class="coordinate-item">
-                    <div>
-                        <strong>Koordinat Lengkap:</strong><br>
-                        <span class="text-sm text-gray-600">${lat.toFixed(6)}, ${lng.toFixed(6)}</span>
-                    </div>
-                    <button class="copy-button" onclick="copyToClipboard('${lat.toFixed(6)}, ${lng.toFixed(6)}', this)">Salin</button>
-                </div>
-                
-                <div class="coordinate-item">
-                    <div>
-                        <strong>Format CSV:</strong><br>
-                        <span class="text-sm text-gray-600">Nama Konten, ${lat.toFixed(6)}, ${lng.toFixed(6)}, URL</span>
-                    </div>
-                    <button class="copy-button" onclick="copyToClipboard('Nama Konten, ${lat.toFixed(6)}, ${lng.toFixed(6)}, URL', this)">Salin</button>
-                </div>
-                
-                <div class="mt-3 text-xs text-gray-500">
-                    Akurasi: ±${Math.round(accuracy)}m
-                </div>
-            `;
-        }
-
-        // Copy to clipboard function
-        function copyToClipboard(text, button) {
-            navigator.clipboard.writeText(text).then(() => {
-                // Change button appearance temporarily
-                const originalText = button.textContent;
-                button.textContent = 'Tersalin!';
-                button.classList.add('copied');
-                
-                setTimeout(() => {
-                    button.textContent = originalText;
-                    button.classList.remove('copied');
-                }, 2000);
-            }).catch(err => {
-                console.error('Failed to copy: ', err);
-                alert('Gagal menyalin ke clipboard');
-            });
-        }
 
         // Update student map markers
         function updateStudentMapMarkers() {
@@ -1754,11 +1562,7 @@
             const overlay = document.getElementById('ar-overlay');
             overlay.innerHTML = '';
             
-            // Don't render regular AR objects if in placement mode
-            if (placementMode) {
-                renderWorldAnchoredObjects();
-                return;
-            }
+
             
             arObjects.forEach(arObject => {
                 const content = arObject.content;
@@ -1917,8 +1721,7 @@
                 }
             });
             
-            // Also render world-anchored objects
-            renderWorldAnchoredObjects();
+
         }
 
         // Toggle AR view mode
@@ -2207,9 +2010,6 @@
 
         // Show AR content in modal
         function showARContent(content) {
-            // Check if content can be placed in world (3D, image, or video)
-            const canBePlaced = ['3d', 'image', 'video'].includes(content.type);
-            
             // Create a modal to show the content in detail
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
@@ -2225,7 +2025,7 @@
                     </div>
                 `;
             } else if (content.type === '3d') {
-                // Use model-viewer for 3D models
+                // Use model-viewer for 3D models with description
                 contentHtml = `
                     <div class="text-center">
                         <model-viewer src="${content.content}" 
@@ -2237,6 +2037,7 @@
                             ar-modes="webxr scene-viewer quick-look"
                             touch-action="pan-y">
                         </model-viewer>
+                        ${content.description ? `<div class="mt-3 p-3 bg-gray-50 rounded-lg text-left"><p class="text-sm text-gray-700">${content.description}</p></div>` : ''}
                     </div>
                 `;
             } else if (content.type === 'video') {
@@ -2296,16 +2097,9 @@
                         </div>
                     </div>
                     <div class="p-4 border-t border-gray-200">
-                        <div class="flex gap-2">
-                            <button class="navigate-btn flex-1 bg-blue-600 text-white py-2 rounded-lg">
-                                Navigasi ke lokasi ini
-                            </button>
-                            ${canBePlaced ? `
-                                <button class="place-in-world-btn flex-1 bg-green-600 text-white py-2 rounded-lg">
-                                    Taruh di Dunia Nyata
-                                </button>
-                            ` : ''}
-                        </div>
+                        <button class="navigate-btn w-full bg-blue-600 text-white py-2 rounded-lg">
+                            Navigasi ke lokasi ini
+                        </button>
                     </div>
                 </div>
             `;
@@ -2322,14 +2116,6 @@
                 updateDirectionArrow();
                 document.body.removeChild(modal);
             });
-            
-            // Add placement button listener if available
-            if (canBePlaced) {
-                modal.querySelector('.place-in-world-btn').addEventListener('click', () => {
-                    document.body.removeChild(modal);
-                    enterPlacementMode(content);
-                });
-            }
             
             // Add presentation navigation listeners if needed
             if (content.type === 'presentation') {
@@ -2378,401 +2164,10 @@
             }
         }
 
-        // Initialize placement controls
-        function initializePlacementControls() {
-            const placeObjectBtn = document.getElementById('place-object-btn');
-            const cancelPlacementBtn = document.getElementById('cancel-placement-btn');
-            
-            placeObjectBtn.addEventListener('click', () => {
-                if (pendingPlacement && currentPosition) {
-                    placeObjectInWorld();
-                }
-            });
-            
-            cancelPlacementBtn.addEventListener('click', () => {
-                exitPlacementMode();
-            });
-        }
 
-        // Enter placement mode
-        function enterPlacementMode(content) {
-            placementMode = true;
-            pendingPlacement = content;
-            
-            console.log('Entering placement mode for:', content.title);
-            console.log('Current position:', currentPosition);
-            console.log('Current heading:', currentHeading);
-            
-            // Show placement controls
-            document.getElementById('placement-controls').classList.remove('hidden');
-            
-            // Hide other UI elements temporarily
-            document.querySelector('.ar-view-mode-toggle').style.display = 'none';
-            document.querySelector('.direction-arrow').style.display = 'none';
-            document.getElementById('distance-indicator').style.display = 'none';
-            
-            // Update placement instructions
-            const instructions = document.querySelector('.placement-instructions');
-            if (instructions) {
-                instructions.textContent = `Arahkan kamera ke lokasi untuk menempatkan "${content.title}"`;
-            }
-        }
-
-        // Exit placement mode
-        function exitPlacementMode() {
-            placementMode = false;
-            pendingPlacement = null;
-            
-            // Hide placement controls
-            document.getElementById('placement-controls').classList.add('hidden');
-            
-            // Show other UI elements
-            document.querySelector('.ar-view-mode-toggle').style.display = 'flex';
-            document.querySelector('.direction-arrow').style.display = 'flex';
-            document.getElementById('distance-indicator').style.display = 'block';
-        }
-
-        // Place object in world coordinates
-        function placeObjectInWorld() {
-            if (!pendingPlacement || !currentPosition) {
-                alert('Tidak dapat menempatkan objek. Pastikan lokasi GPS tersedia.');
-                return;
-            }
-            
-            try {
-                // Calculate placement position based on current position and heading
-                // Place object 2 meters in front of user
-                const distance = 2; // meters
-                const bearing = currentHeading;
-                
-                // Convert bearing and distance to lat/lng offset
-                const earthRadius = 6371000; // Earth radius in meters
-                const lat1 = currentPosition.lat * Math.PI / 180;
-                const lon1 = currentPosition.lng * Math.PI / 180;
-                const bearingRad = bearing * Math.PI / 180;
-                
-                const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distance / earthRadius) +
-                                      Math.cos(lat1) * Math.sin(distance / earthRadius) * Math.cos(bearingRad));
-                const lon2 = lon1 + Math.atan2(Math.sin(bearingRad) * Math.sin(distance / earthRadius) * Math.cos(lat1),
-                                              Math.cos(distance / earthRadius) - Math.sin(lat1) * Math.sin(lat2));
-                
-                const placementLat = lat2 * 180 / Math.PI;
-                const placementLng = lon2 * 180 / Math.PI;
-                
-                // Validate coordinates
-                if (isNaN(placementLat) || isNaN(placementLng)) {
-                    throw new Error('Invalid coordinates calculated');
-                }
-                
-                // Create world-anchored object data
-                const worldObject = {
-                    id: `placed_${pendingPlacement.id}_${Date.now()}`,
-                    contentId: pendingPlacement.id,
-                    content: { ...pendingPlacement }, // Clone the content
-                    lat: placementLat,
-                    lng: placementLng,
-                    placedAt: Date.now(),
-                    placedHeading: currentHeading,
-                    height: 1.5, // Default height above ground
-                    scale: 1.0
-                };
-                
-                // Store in world anchored objects
-                worldAnchoredObjects.set(worldObject.id, worldObject);
-                placedObjectsData.set(worldObject.id, worldObject);
-                
-                // Save to localStorage
-                savePlacedObjects();
-                
-                // Exit placement mode
-                exitPlacementMode();
-                
-                // Show confirmation with coordinates for debugging
-                console.log('Object placed at:', placementLat, placementLng);
-                alert(`Objek "${pendingPlacement.title}" telah ditempatkan di dunia nyata!\nKoordinat: ${placementLat.toFixed(6)}, ${placementLng.toFixed(6)}`);
-                
-            } catch (error) {
-                console.error('Error placing object:', error);
-                alert('Gagal menempatkan objek. Silakan coba lagi.');
-            }
-        }
-
-        // Save placed objects to localStorage
-        function savePlacedObjects() {
-            const objectsArray = Array.from(placedObjectsData.values());
-            localStorage.setItem('placedObjects', JSON.stringify(objectsArray));
-        }
-
-        // Load placed objects from localStorage
-        function loadPlacedObjects() {
-            const stored = localStorage.getItem('placedObjects');
-            if (stored) {
-                const objectsArray = JSON.parse(stored);
-                objectsArray.forEach(obj => {
-                    worldAnchoredObjects.set(obj.id, obj);
-                    placedObjectsData.set(obj.id, obj);
-                });
-            }
-        }
-
-        // Render world-anchored objects
-        function renderWorldAnchoredObjects() {
-            if (!currentPosition || worldAnchoredObjects.size === 0) return;
-            
-            const overlay = document.getElementById('ar-overlay');
-            
-            // Create a container for world objects if it doesn't exist
-            let worldContainer = overlay.querySelector('.world-objects-container');
-            if (!worldContainer) {
-                worldContainer = document.createElement('div');
-                worldContainer.className = 'world-objects-container';
-                worldContainer.style.position = 'absolute';
-                worldContainer.style.top = '0';
-                worldContainer.style.left = '0';
-                worldContainer.style.width = '100%';
-                worldContainer.style.height = '100%';
-                worldContainer.style.pointerEvents = 'none';
-                overlay.appendChild(worldContainer);
-            } else {
-                // Clear existing world objects
-                worldContainer.innerHTML = '';
-            }
-            
-            worldAnchoredObjects.forEach(worldObject => {
-                try {
-                    // Calculate distance to placed object
-                    const distance = calculateDistance(
-                        currentPosition.lat, currentPosition.lng,
-                        worldObject.lat, worldObject.lng
-                    );
-                    
-                    // Only render if within reasonable distance (100m)
-                    if (distance > 100) return;
-                    
-                    // Calculate bearing to object
-                    const bearing = calculateBearing(
-                        currentPosition.lat, currentPosition.lng,
-                        worldObject.lat, worldObject.lng
-                    );
-                    
-                    // Calculate relative bearing
-                    const relativeBearing = (bearing - currentHeading + 360) % 360;
-                    
-                    // Show if within field of view (wider angle for better visibility)
-                    if (relativeBearing < 90 || relativeBearing > 270) {
-                        // Create world-anchored object element
-                        const worldObjectElement = document.createElement('div');
-                        worldObjectElement.className = 'world-anchored-object';
-                        worldObjectElement.style.pointerEvents = 'auto';
-                        
-                        // Calculate horizontal position
-                        let viewportX;
-                        if (relativeBearing <= 90) {
-                            viewportX = 50 + (relativeBearing / 90) * 45;
-                        } else {
-                            viewportX = 50 - ((360 - relativeBearing) / 90) * 45;
-                        }
-                        
-                        // Calculate vertical position based on height and device tilt
-                        const deviceTilt = deviceOrientation.beta || 0;
-                        const tiltAdjustment = (90 - deviceTilt) * 0.3;
-                        const baseHeight = worldObject.height || 1.5;
-                        const viewportY = 50 - (baseHeight * 5) - tiltAdjustment;
-                        
-                        // Calculate scale based on distance
-                        const maxDistance = 50; // Max distance for scaling
-                        const minScale = 0.2;
-                        const maxScale = 1.5;
-                        const distanceScale = Math.max(minScale, maxScale - (distance / maxDistance) * (maxScale - minScale));
-                        const totalScale = distanceScale * (worldObject.scale || 1.0);
-                        
-                        // Position the object
-                        worldObjectElement.style.left = `${Math.max(5, Math.min(95, viewportX))}%`;
-                        worldObjectElement.style.top = `${Math.max(10, Math.min(80, viewportY))}%`;
-                        
-                        // Create content based on type
-                        let contentElement;
-                        const content = worldObject.content;
-                        
-                        if (content.type === 'image') {
-                            contentElement = document.createElement('img');
-                            contentElement.className = 'world-anchored-image world-anchored-content';
-                            contentElement.src = content.content;
-                            contentElement.alt = content.title;
-                            contentElement.style.maxWidth = '200px';
-                            contentElement.style.maxHeight = '200px';
-                            contentElement.onerror = function() {
-                                this.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%234f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
-                            };
-                        } else if (content.type === '3d') {
-                            contentElement = document.createElement('div');
-                            contentElement.className = 'world-anchored-3d world-anchored-content';
-                            contentElement.style.width = '150px';
-                            contentElement.style.height = '150px';
-                            contentElement.style.backgroundColor = 'rgba(37, 99, 235, 0.8)';
-                            contentElement.style.borderRadius = '10px';
-                            contentElement.style.display = 'flex';
-                            contentElement.style.alignItems = 'center';
-                            contentElement.style.justifyContent = 'center';
-                            contentElement.style.color = 'white';
-                            contentElement.style.fontWeight = 'bold';
-                            contentElement.style.fontSize = '24px';
-                            contentElement.textContent = '3D';
-                            contentElement.style.animation = 'float 3s infinite ease-in-out';
-                        } else if (content.type === 'video') {
-                            contentElement = document.createElement('div');
-                            contentElement.className = 'world-anchored-video world-anchored-content';
-                            contentElement.style.width = '200px';
-                            contentElement.style.height = '150px';
-                            contentElement.style.backgroundColor = '#000';
-                            contentElement.style.borderRadius = '10px';
-                            contentElement.style.display = 'flex';
-                            contentElement.style.alignItems = 'center';
-                            contentElement.style.justifyContent = 'center';
-                            contentElement.style.color = 'white';
-                            contentElement.innerHTML = `
-                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                </svg>
-                            `;
-                        }
-                        
-                        if (contentElement) {
-                            // Apply 3D transform with perspective correction
-                            const perspectiveDistance = Math.max(300, 3000 - (distance * 30));
-                            const rotationY = relativeBearing <= 90 ? relativeBearing * 0.2 : (360 - relativeBearing) * -0.2;
-                            const rotationX = (deviceTilt - 90) * 0.1;
-                            
-                            worldObjectElement.style.transform = `translate(-50%, -50%) scale(${totalScale}) perspective(${perspectiveDistance}px) rotateY(${rotationY}deg) rotateX(${rotationX}deg)`;
-                            worldObjectElement.style.transformStyle = 'preserve-3d';
-                            
-                            // Add distance label
-                            const distanceLabel = document.createElement('div');
-                            distanceLabel.className = 'ar-object-distance';
-                            distanceLabel.textContent = `${Math.round(distance)}m`;
-                            distanceLabel.style.position = 'absolute';
-                            distanceLabel.style.bottom = '-25px';
-                            distanceLabel.style.left = '50%';
-                            distanceLabel.style.transform = 'translateX(-50%)';
-                            distanceLabel.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-                            distanceLabel.style.color = 'white';
-                            distanceLabel.style.padding = '2px 8px';
-                            distanceLabel.style.borderRadius = '10px';
-                            distanceLabel.style.fontSize = '10px';
-                            
-                            // Add title label
-                            const titleLabel = document.createElement('div');
-                            titleLabel.className = 'ar-object-label';
-                            titleLabel.textContent = content.title;
-                            titleLabel.style.position = 'absolute';
-                            titleLabel.style.top = '-30px';
-                            titleLabel.style.left = '50%';
-                            titleLabel.style.transform = 'translateX(-50%)';
-                            titleLabel.style.backgroundColor = 'rgba(37, 99, 235, 0.9)';
-                            titleLabel.style.color = 'white';
-                            titleLabel.style.padding = '4px 10px';
-                            titleLabel.style.borderRadius = '15px';
-                            titleLabel.style.fontSize = '12px';
-                            titleLabel.style.whiteSpace = 'nowrap';
-                            
-                            worldObjectElement.appendChild(contentElement);
-                            worldObjectElement.appendChild(titleLabel);
-                            worldObjectElement.appendChild(distanceLabel);
-                            
-                            // Add click event for interaction
-                            worldObjectElement.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                showWorldObjectDetails(worldObject);
-                            });
-                            
-                            worldContainer.appendChild(worldObjectElement);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error rendering world object:', error);
-                }
-            });
-        }
-
-        // Show world object details
-        function showWorldObjectDetails(worldObject) {
-            const content = worldObject.content;
-            
-            // Create modal
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
-            
-            modal.innerHTML = `
-                <div class="bg-white rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto">
-                    <div class="p-4 border-b border-gray-200 flex justify-between items-center">
-                        <h3 class="text-lg font-semibold">${content.title}</h3>
-                        <button class="close-modal text-gray-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="p-4">
-                        <p class="text-gray-600 mb-4">Objek ini telah ditempatkan di dunia nyata. Anda dapat berjalan mengelilinginya untuk melihat dari berbagai sudut.</p>
-                        <div class="text-sm text-gray-500">
-                            Jarak: ${Math.round(calculateDistance(currentPosition.lat, currentPosition.lng, worldObject.lat, worldObject.lng))}m<br>
-                            Ditempatkan: ${new Date(worldObject.placedAt).toLocaleString('id-ID')}
-                        </div>
-                    </div>
-                    <div class="p-4 border-t border-gray-200 flex gap-2">
-                        <button class="remove-object flex-1 bg-red-600 text-white py-2 rounded-lg">
-                            Hapus Objek
-                        </button>
-                        <button class="navigate-object flex-1 bg-blue-600 text-white py-2 rounded-lg">
-                            Navigasi ke Objek
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-            
-            // Add event listeners
-            modal.querySelector('.close-modal').addEventListener('click', () => {
-                document.body.removeChild(modal);
-            });
-            
-            modal.querySelector('.remove-object').addEventListener('click', () => {
-                if (confirm('Apakah Anda yakin ingin menghapus objek ini dari dunia nyata?')) {
-                    removeWorldObject(worldObject.id);
-                    document.body.removeChild(modal);
-                }
-            });
-            
-            modal.querySelector('.navigate-object').addEventListener('click', () => {
-                // Create a temporary target for navigation
-                targetARContent = {
-                    ...content,
-                    lat: worldObject.lat,
-                    lng: worldObject.lng,
-                    distance: calculateDistance(currentPosition.lat, currentPosition.lng, worldObject.lat, worldObject.lng)
-                };
-                updateDirectionArrow();
-                document.body.removeChild(modal);
-            });
-            
-            // Close when clicking outside
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    document.body.removeChild(modal);
-                }
-            });
-        }
-
-        // Remove world object
-        function removeWorldObject(objectId) {
-            worldAnchoredObjects.delete(objectId);
-            placedObjectsData.delete(objectId);
-            savePlacedObjects();
-        }
 
         // Initialize the app when the page loads
         window.onload = initApp;
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c1863e1156ccfd',t:'MTc1NDY4MjQzNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c1a19465a55c61',t:'MTc1NDY4MzU1NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
