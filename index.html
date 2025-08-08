@@ -2399,6 +2399,10 @@
             placementMode = true;
             pendingPlacement = content;
             
+            console.log('Entering placement mode for:', content.title);
+            console.log('Current position:', currentPosition);
+            console.log('Current heading:', currentHeading);
+            
             // Show placement controls
             document.getElementById('placement-controls').classList.remove('hidden');
             
@@ -2406,6 +2410,12 @@
             document.querySelector('.ar-view-mode-toggle').style.display = 'none';
             document.querySelector('.direction-arrow').style.display = 'none';
             document.getElementById('distance-indicator').style.display = 'none';
+            
+            // Update placement instructions
+            const instructions = document.querySelector('.placement-instructions');
+            if (instructions) {
+                instructions.textContent = `Arahkan kamera ke lokasi untuk menempatkan "${content.title}"`;
+            }
         }
 
         // Exit placement mode
@@ -2424,52 +2434,67 @@
 
         // Place object in world coordinates
         function placeObjectInWorld() {
-            if (!pendingPlacement || !currentPosition) return;
+            if (!pendingPlacement || !currentPosition) {
+                alert('Tidak dapat menempatkan objek. Pastikan lokasi GPS tersedia.');
+                return;
+            }
             
-            // Calculate placement position based on current position and heading
-            // Place object 2 meters in front of user
-            const distance = 2; // meters
-            const bearing = currentHeading;
-            
-            // Convert bearing and distance to lat/lng offset
-            const earthRadius = 6371000; // Earth radius in meters
-            const lat1 = currentPosition.lat * Math.PI / 180;
-            const lon1 = currentPosition.lng * Math.PI / 180;
-            const bearingRad = bearing * Math.PI / 180;
-            
-            const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distance / earthRadius) +
-                                  Math.cos(lat1) * Math.sin(distance / earthRadius) * Math.cos(bearingRad));
-            const lon2 = lon1 + Math.atan2(Math.sin(bearingRad) * Math.sin(distance / earthRadius) * Math.cos(lat1),
-                                          Math.cos(distance / earthRadius) - Math.sin(lat1) * Math.sin(lat2));
-            
-            const placementLat = lat2 * 180 / Math.PI;
-            const placementLng = lon2 * 180 / Math.PI;
-            
-            // Create world-anchored object data
-            const worldObject = {
-                id: `placed_${pendingPlacement.id}_${Date.now()}`,
-                contentId: pendingPlacement.id,
-                content: pendingPlacement,
-                lat: placementLat,
-                lng: placementLng,
-                placedAt: Date.now(),
-                placedHeading: currentHeading,
-                height: 1.5, // Default height above ground
-                scale: 1.0
-            };
-            
-            // Store in world anchored objects
-            worldAnchoredObjects.set(worldObject.id, worldObject);
-            placedObjectsData.set(worldObject.id, worldObject);
-            
-            // Save to localStorage
-            savePlacedObjects();
-            
-            // Exit placement mode
-            exitPlacementMode();
-            
-            // Show confirmation
-            alert(`Objek "${pendingPlacement.title}" telah ditempatkan di dunia nyata!`);
+            try {
+                // Calculate placement position based on current position and heading
+                // Place object 2 meters in front of user
+                const distance = 2; // meters
+                const bearing = currentHeading;
+                
+                // Convert bearing and distance to lat/lng offset
+                const earthRadius = 6371000; // Earth radius in meters
+                const lat1 = currentPosition.lat * Math.PI / 180;
+                const lon1 = currentPosition.lng * Math.PI / 180;
+                const bearingRad = bearing * Math.PI / 180;
+                
+                const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distance / earthRadius) +
+                                      Math.cos(lat1) * Math.sin(distance / earthRadius) * Math.cos(bearingRad));
+                const lon2 = lon1 + Math.atan2(Math.sin(bearingRad) * Math.sin(distance / earthRadius) * Math.cos(lat1),
+                                              Math.cos(distance / earthRadius) - Math.sin(lat1) * Math.sin(lat2));
+                
+                const placementLat = lat2 * 180 / Math.PI;
+                const placementLng = lon2 * 180 / Math.PI;
+                
+                // Validate coordinates
+                if (isNaN(placementLat) || isNaN(placementLng)) {
+                    throw new Error('Invalid coordinates calculated');
+                }
+                
+                // Create world-anchored object data
+                const worldObject = {
+                    id: `placed_${pendingPlacement.id}_${Date.now()}`,
+                    contentId: pendingPlacement.id,
+                    content: { ...pendingPlacement }, // Clone the content
+                    lat: placementLat,
+                    lng: placementLng,
+                    placedAt: Date.now(),
+                    placedHeading: currentHeading,
+                    height: 1.5, // Default height above ground
+                    scale: 1.0
+                };
+                
+                // Store in world anchored objects
+                worldAnchoredObjects.set(worldObject.id, worldObject);
+                placedObjectsData.set(worldObject.id, worldObject);
+                
+                // Save to localStorage
+                savePlacedObjects();
+                
+                // Exit placement mode
+                exitPlacementMode();
+                
+                // Show confirmation with coordinates for debugging
+                console.log('Object placed at:', placementLat, placementLng);
+                alert(`Objek "${pendingPlacement.title}" telah ditempatkan di dunia nyata!\nKoordinat: ${placementLat.toFixed(6)}, ${placementLng.toFixed(6)}`);
+                
+            } catch (error) {
+                console.error('Error placing object:', error);
+                alert('Gagal menempatkan objek. Silakan coba lagi.');
+            }
         }
 
         // Save placed objects to localStorage
@@ -2492,131 +2517,179 @@
 
         // Render world-anchored objects
         function renderWorldAnchoredObjects() {
-            if (!currentPosition) return;
+            if (!currentPosition || worldAnchoredObjects.size === 0) return;
             
             const overlay = document.getElementById('ar-overlay');
             
+            // Create a container for world objects if it doesn't exist
+            let worldContainer = overlay.querySelector('.world-objects-container');
+            if (!worldContainer) {
+                worldContainer = document.createElement('div');
+                worldContainer.className = 'world-objects-container';
+                worldContainer.style.position = 'absolute';
+                worldContainer.style.top = '0';
+                worldContainer.style.left = '0';
+                worldContainer.style.width = '100%';
+                worldContainer.style.height = '100%';
+                worldContainer.style.pointerEvents = 'none';
+                overlay.appendChild(worldContainer);
+            } else {
+                // Clear existing world objects
+                worldContainer.innerHTML = '';
+            }
+            
             worldAnchoredObjects.forEach(worldObject => {
-                // Calculate distance to placed object
-                const distance = calculateDistance(
-                    currentPosition.lat, currentPosition.lng,
-                    worldObject.lat, worldObject.lng
-                );
-                
-                // Only render if within reasonable distance (50m)
-                if (distance > 50) return;
-                
-                // Calculate bearing to object
-                const bearing = calculateBearing(
-                    currentPosition.lat, currentPosition.lng,
-                    worldObject.lat, worldObject.lng
-                );
-                
-                // Calculate relative bearing
-                const relativeBearing = (bearing - currentHeading + 360) % 360;
-                
-                // Only show if within field of view (120 degrees)
-                if (relativeBearing < 60 || relativeBearing > 300) {
-                    // Create world-anchored object element
-                    const worldObjectElement = document.createElement('div');
-                    worldObjectElement.className = 'world-anchored-object';
+                try {
+                    // Calculate distance to placed object
+                    const distance = calculateDistance(
+                        currentPosition.lat, currentPosition.lng,
+                        worldObject.lat, worldObject.lng
+                    );
                     
-                    // Calculate horizontal position
-                    let viewportX;
-                    if (relativeBearing < 60) {
-                        viewportX = 50 + (relativeBearing / 60) * 40;
-                    } else {
-                        viewportX = 50 - ((360 - relativeBearing) / 60) * 40;
+                    // Only render if within reasonable distance (100m)
+                    if (distance > 100) return;
+                    
+                    // Calculate bearing to object
+                    const bearing = calculateBearing(
+                        currentPosition.lat, currentPosition.lng,
+                        worldObject.lat, worldObject.lng
+                    );
+                    
+                    // Calculate relative bearing
+                    const relativeBearing = (bearing - currentHeading + 360) % 360;
+                    
+                    // Show if within field of view (wider angle for better visibility)
+                    if (relativeBearing < 90 || relativeBearing > 270) {
+                        // Create world-anchored object element
+                        const worldObjectElement = document.createElement('div');
+                        worldObjectElement.className = 'world-anchored-object';
+                        worldObjectElement.style.pointerEvents = 'auto';
+                        
+                        // Calculate horizontal position
+                        let viewportX;
+                        if (relativeBearing <= 90) {
+                            viewportX = 50 + (relativeBearing / 90) * 45;
+                        } else {
+                            viewportX = 50 - ((360 - relativeBearing) / 90) * 45;
+                        }
+                        
+                        // Calculate vertical position based on height and device tilt
+                        const deviceTilt = deviceOrientation.beta || 0;
+                        const tiltAdjustment = (90 - deviceTilt) * 0.3;
+                        const baseHeight = worldObject.height || 1.5;
+                        const viewportY = 50 - (baseHeight * 5) - tiltAdjustment;
+                        
+                        // Calculate scale based on distance
+                        const maxDistance = 50; // Max distance for scaling
+                        const minScale = 0.2;
+                        const maxScale = 1.5;
+                        const distanceScale = Math.max(minScale, maxScale - (distance / maxDistance) * (maxScale - minScale));
+                        const totalScale = distanceScale * (worldObject.scale || 1.0);
+                        
+                        // Position the object
+                        worldObjectElement.style.left = `${Math.max(5, Math.min(95, viewportX))}%`;
+                        worldObjectElement.style.top = `${Math.max(10, Math.min(80, viewportY))}%`;
+                        
+                        // Create content based on type
+                        let contentElement;
+                        const content = worldObject.content;
+                        
+                        if (content.type === 'image') {
+                            contentElement = document.createElement('img');
+                            contentElement.className = 'world-anchored-image world-anchored-content';
+                            contentElement.src = content.content;
+                            contentElement.alt = content.title;
+                            contentElement.style.maxWidth = '200px';
+                            contentElement.style.maxHeight = '200px';
+                            contentElement.onerror = function() {
+                                this.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%234f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
+                            };
+                        } else if (content.type === '3d') {
+                            contentElement = document.createElement('div');
+                            contentElement.className = 'world-anchored-3d world-anchored-content';
+                            contentElement.style.width = '150px';
+                            contentElement.style.height = '150px';
+                            contentElement.style.backgroundColor = 'rgba(37, 99, 235, 0.8)';
+                            contentElement.style.borderRadius = '10px';
+                            contentElement.style.display = 'flex';
+                            contentElement.style.alignItems = 'center';
+                            contentElement.style.justifyContent = 'center';
+                            contentElement.style.color = 'white';
+                            contentElement.style.fontWeight = 'bold';
+                            contentElement.style.fontSize = '24px';
+                            contentElement.textContent = '3D';
+                            contentElement.style.animation = 'float 3s infinite ease-in-out';
+                        } else if (content.type === 'video') {
+                            contentElement = document.createElement('div');
+                            contentElement.className = 'world-anchored-video world-anchored-content';
+                            contentElement.style.width = '200px';
+                            contentElement.style.height = '150px';
+                            contentElement.style.backgroundColor = '#000';
+                            contentElement.style.borderRadius = '10px';
+                            contentElement.style.display = 'flex';
+                            contentElement.style.alignItems = 'center';
+                            contentElement.style.justifyContent = 'center';
+                            contentElement.style.color = 'white';
+                            contentElement.innerHTML = `
+                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                            `;
+                        }
+                        
+                        if (contentElement) {
+                            // Apply 3D transform with perspective correction
+                            const perspectiveDistance = Math.max(300, 3000 - (distance * 30));
+                            const rotationY = relativeBearing <= 90 ? relativeBearing * 0.2 : (360 - relativeBearing) * -0.2;
+                            const rotationX = (deviceTilt - 90) * 0.1;
+                            
+                            worldObjectElement.style.transform = `translate(-50%, -50%) scale(${totalScale}) perspective(${perspectiveDistance}px) rotateY(${rotationY}deg) rotateX(${rotationX}deg)`;
+                            worldObjectElement.style.transformStyle = 'preserve-3d';
+                            
+                            // Add distance label
+                            const distanceLabel = document.createElement('div');
+                            distanceLabel.className = 'ar-object-distance';
+                            distanceLabel.textContent = `${Math.round(distance)}m`;
+                            distanceLabel.style.position = 'absolute';
+                            distanceLabel.style.bottom = '-25px';
+                            distanceLabel.style.left = '50%';
+                            distanceLabel.style.transform = 'translateX(-50%)';
+                            distanceLabel.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                            distanceLabel.style.color = 'white';
+                            distanceLabel.style.padding = '2px 8px';
+                            distanceLabel.style.borderRadius = '10px';
+                            distanceLabel.style.fontSize = '10px';
+                            
+                            // Add title label
+                            const titleLabel = document.createElement('div');
+                            titleLabel.className = 'ar-object-label';
+                            titleLabel.textContent = content.title;
+                            titleLabel.style.position = 'absolute';
+                            titleLabel.style.top = '-30px';
+                            titleLabel.style.left = '50%';
+                            titleLabel.style.transform = 'translateX(-50%)';
+                            titleLabel.style.backgroundColor = 'rgba(37, 99, 235, 0.9)';
+                            titleLabel.style.color = 'white';
+                            titleLabel.style.padding = '4px 10px';
+                            titleLabel.style.borderRadius = '15px';
+                            titleLabel.style.fontSize = '12px';
+                            titleLabel.style.whiteSpace = 'nowrap';
+                            
+                            worldObjectElement.appendChild(contentElement);
+                            worldObjectElement.appendChild(titleLabel);
+                            worldObjectElement.appendChild(distanceLabel);
+                            
+                            // Add click event for interaction
+                            worldObjectElement.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                showWorldObjectDetails(worldObject);
+                            });
+                            
+                            worldContainer.appendChild(worldObjectElement);
+                        }
                     }
-                    
-                    // Calculate vertical position based on height and device tilt
-                    const deviceTilt = deviceOrientation.beta || 0;
-                    const tiltAdjustment = (90 - deviceTilt) * 0.5;
-                    const viewportY = 50 - (worldObject.height * 3) - tiltAdjustment;
-                    
-                    // Calculate scale based on distance
-                    const maxDistance = 20; // Max distance for scaling
-                    const minScale = 0.1;
-                    const maxScale = 2.0;
-                    const distanceScale = Math.max(minScale, maxScale - (distance / maxDistance) * (maxScale - minScale));
-                    const totalScale = distanceScale * worldObject.scale;
-                    
-                    // Position the object
-                    worldObjectElement.style.left = `${Math.max(5, Math.min(95, viewportX))}%`;
-                    worldObjectElement.style.top = `${Math.max(5, Math.min(85, viewportY))}%`;
-                    
-                    // Create content based on type
-                    let contentElement;
-                    const content = worldObject.content;
-                    
-                    if (content.type === 'image') {
-                        contentElement = document.createElement('img');
-                        contentElement.className = 'world-anchored-image world-anchored-content';
-                        contentElement.src = content.content;
-                        contentElement.alt = content.title;
-                        contentElement.onerror = function() {
-                            this.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%234f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
-                        };
-                    } else if (content.type === '3d') {
-                        contentElement = document.createElement('div');
-                        contentElement.className = 'world-anchored-3d world-anchored-content';
-                        contentElement.innerHTML = `
-                            <model-viewer src="${content.content}" 
-                                alt="${content.title}" 
-                                auto-rotate 
-                                camera-controls 
-                                shadow-intensity="1" 
-                                ar 
-                                ar-modes="webxr scene-viewer quick-look"
-                                touch-action="pan-y"
-                                style="width: 100%; height: 100%; background-color: transparent;">
-                            </model-viewer>
-                        `;
-                    } else if (content.type === 'video') {
-                        contentElement = document.createElement('div');
-                        contentElement.className = 'world-anchored-video world-anchored-content';
-                        contentElement.innerHTML = `
-                            <iframe 
-                                src="https://www.youtube.com/embed/${content.content}?autoplay=0&controls=1&rel=0" 
-                                title="${content.title}"
-                                frameborder="0" 
-                                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                allowfullscreen
-                                style="width: 100%; height: 100%;">
-                            </iframe>
-                        `;
-                    }
-                    
-                    if (contentElement) {
-                        // Apply 3D transform with perspective correction
-                        const perspectiveDistance = Math.max(200, 2000 - (distance * 50));
-                        const rotationY = relativeBearing < 60 ? relativeBearing * 0.3 : (360 - relativeBearing) * -0.3;
-                        const rotationX = (deviceTilt - 90) * 0.2;
-                        
-                        worldObjectElement.style.transform = `translate(-50%, -50%) scale(${totalScale}) perspective(${perspectiveDistance}px) rotateY(${rotationY}deg) rotateX(${rotationX}deg)`;
-                        worldObjectElement.style.transformStyle = 'preserve-3d';
-                        
-                        // Add distance label
-                        const distanceLabel = document.createElement('div');
-                        distanceLabel.className = 'ar-object-distance';
-                        distanceLabel.textContent = `${Math.round(distance)}m`;
-                        
-                        // Add title label
-                        const titleLabel = document.createElement('div');
-                        titleLabel.className = 'ar-object-label';
-                        titleLabel.textContent = content.title;
-                        
-                        worldObjectElement.appendChild(contentElement);
-                        worldObjectElement.appendChild(titleLabel);
-                        worldObjectElement.appendChild(distanceLabel);
-                        
-                        // Add click event for interaction
-                        worldObjectElement.addEventListener('click', () => {
-                            showWorldObjectDetails(worldObject);
-                        });
-                        
-                        overlay.appendChild(worldObjectElement);
-                    }
+                } catch (error) {
+                    console.error('Error rendering world object:', error);
                 }
             });
         }
@@ -2701,5 +2774,5 @@
         // Initialize the app when the page loads
         window.onload = initApp;
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c16fce70b3b59f',t:'MTc1NDY4MTUxNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c1863e1156ccfd',t:'MTc1NDY4MjQzNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
