@@ -1,117 +1,229 @@
+
+
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Location-Based AR Android</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>AR Geolokasi Android</title>
 
-    <!-- A-Frame & AR.js v3 -->
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.min.js"></script>
+  <!-- A-Frame + AR.js -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.min.js"></script>
+  <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Look-at component -->
-    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #0f172a;
+      color: white;
+      font-family: sans-serif;
+    }
+    a-scene {
+      position: fixed !important;
+      top: 0; left: 0;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 1;
+    }
+    .overlay {
+      position: fixed;
+      z-index: 1000;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.85);
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    #loadingScreen { z-index: 1100; }
+    .btn {
+      background: #06b6d4;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: bold;
+      margin-top: 12px;
+    }
+    .menu {
+      position: fixed;
+      z-index: 1010;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      padding: 10px 16px;
+      border-radius: 12px;
+      display: flex;
+      gap: 10px;
+    }
+    .menu button {
+      background: #334155;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
 
-    <style>
-      body, html {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background: black;
+  <!-- Home UI -->
+  <div id="home" class="overlay">
+    <h1 class="text-3xl font-bold mb-2">🌐 AR Geolokasi</h1>
+    <p class="text-sm opacity-80 mb-4">Eksplorasi lokasi sekitar dengan kamera</p>
+    <button id="startBtn" class="btn">🚀 Mulai Jelajah</button>
+    <p class="text-xs mt-6 opacity-50">Gunakan Android + HTTPS (GitHub Pages)</p>
+  </div>
+
+  <!-- Loading screen -->
+  <div id="loadingScreen" class="overlay hidden">
+    <h2 class="text-xl font-semibold animate-pulse mb-4">🔄 Mengaktifkan Kamera & Lokasi...</h2>
+    <p class="text-sm opacity-80">Pastikan kamu memberi izin kamera & lokasi saat diminta</p>
+  </div>
+
+  <!-- Navigation menu -->
+  <div class="menu hidden" id="menu">
+    <button onclick="toggleList()">📄 Daftar</button>
+    <button onclick="toggleAR()">📷 AR</button>
+    <button onclick="toggleNearest()">📍 Terdekat</button>
+  </div>
+
+  <!-- List view -->
+  <div id="listView" class="overlay hidden overflow-y-scroll text-left items-start">
+    <h2 class="text-xl font-bold mb-4">📄 Daftar Lokasi</h2>
+    <ul id="listItems" class="w-full space-y-2"></ul>
+    <button class="btn mt-6" onclick="toggleList()">Tutup</button>
+  </div>
+
+  <!-- AR Scene -->
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true;"
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+  >
+    <a-entity camera gps-camera rotation-reader id="cam"></a-entity>
+  </a-scene>
+
+  <script>
+    const startBtn = document.getElementById("startBtn");
+    const home = document.getElementById("home");
+    const loadingScreen = document.getElementById("loadingScreen");
+    const listView = document.getElementById("listView");
+    const listItems = document.getElementById("listItems");
+    const menu = document.getElementById("menu");
+
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCPrAyjTP4O7lSWJnouA4Ysnd5U88mcM-dWyJG0Nv9eWOA3yVKrGJ1-5G_QDdEcTNpwn0F5XbzeUJh/pub?gid=0&single=true&output=csv';
+
+    let arObjects = [];
+
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function ensureEntity(obj) {
+      const scene = document.querySelector('a-scene');
+      const label = document.createElement('a-text');
+      label.setAttribute('value', obj.name);
+      label.setAttribute('gps-entity-place', `latitude: ${obj.lat}; longitude: ${obj.lon};`);
+      label.setAttribute('look-at', '[gps-camera]');
+      label.setAttribute('scale', '12 12 12');
+      label.setAttribute('color', '#fff');
+      label.setAttribute('align', 'center');
+      scene.appendChild(label);
+    }
+
+    async function loadCSV() {
+      const res = await fetch(CSV_URL);
+      const text = await res.text();
+      const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+      arObjects = parsed.data.map(row => ({
+        name: row.Name || row.name || 'Unknown',
+        lat: parseFloat(row.Lat || row.lat),
+        lon: parseFloat(row.Lon || row.lon),
+      })).filter(o => !isNaN(o.lat) && !isNaN(o.lon));
+    }
+
+    async function requestCameraAccess() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      stream.getTracks().forEach(t => t.stop());
+    }
+
+    function showList() {
+      listItems.innerHTML = '';
+      arObjects.forEach(obj => {
+        const item = document.createElement('li');
+        item.className = "border-b border-white/20 pb-1";
+        item.textContent = `${obj.name} (${obj.lat.toFixed(4)}, ${obj.lon.toFixed(4)})`;
+        listItems.appendChild(item);
+      });
+    }
+
+    function toggleList() {
+      if (listView.classList.contains("hidden")) {
+        showList();
+        listView.classList.remove("hidden");
+      } else {
+        listView.classList.add("hidden");
       }
-      #start-btn {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        padding: 15px 25px;
-        font-size: 18px;
-        background: #28a745;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        z-index: 9999;
-      }
-      #status {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background: rgba(0,0,0,0.6);
-        color: white;
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-size: 14px;
-        z-index: 9999;
-      }
-    </style>
-  </head>
-  <body>
-    <button id="start-btn">Mulai Jelajah</button>
-    <div id="status">Menunggu izin...</div>
+    }
 
-    <a-scene
-      vr-mode-ui="enabled: false"
-      embedded
-      arjs="sourceType: webcam; debugUIEnabled: false;"
-      renderer="logarithmicDepthBuffer: true;"
-      device-orientation-permission-ui="enabled: false"
-    >
-      <a-camera gps-camera rotation-reader></a-camera>
-    </a-scene>
+    function toggleAR() {
+      listView.classList.add("hidden");
+    }
 
-    <script>
-      const startBtn = document.getElementById("start-btn");
-      const statusBox = document.getElementById("status");
-      const scene = document.querySelector("a-scene");
+    function toggleNearest() {
+      alert("🔍 Fitur pencarian lokasi terdekat belum diaktifkan.");
+    }
 
-      // Daftar objek contoh
-      const places = [
-        { name: "Monas", lat: -6.175392, lon: 106.827153 },
-        { name: "Bundaran HI", lat: -6.193056, lon: 106.820556 }
-      ];
+    async function startExperience() {
+      home.classList.add("hidden");
+      loadingScreen.classList.remove("hidden");
 
-      function addPlacesToScene() {
-        places.forEach((place) => {
-          const text = document.createElement("a-text");
-          text.setAttribute("value", place.name);
-          text.setAttribute("look-at", "[gps-camera]");
-          text.setAttribute("scale", "10 10 10");
-          text.setAttribute("align", "center");
-          text.setAttribute("gps-entity-place", `latitude: ${place.lat}; longitude: ${place.lon}`);
-          scene.appendChild(text);
-        });
+      try {
+        await loadCSV();
+        await requestCameraAccess();
+      } catch (e) {
+        alert("Akses kamera ditolak atau data gagal dimuat.");
+        return;
       }
 
-      function requestPermissionsAndStart() {
-        // Android Chrome: minta izin geolokasi
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              statusBox.innerText = "Lokasi diterima. Menampilkan AR...";
-              addPlacesToScene();
-              startBtn.style.display = "none";
-            },
-            (err) => {
-              if (err.code === err.PERMISSION_DENIED) {
-                statusBox.innerText = "Izin lokasi dibutuhkan!";
-              } else {
-                statusBox.innerText = "Gagal mendapatkan lokasi.";
-              }
-            },
-            { enableHighAccuracy: true, timeout: 15000 }
-          );
-        } else {
-          statusBox.innerText = "Browser tidak mendukung GPS.";
-        }
-
-        // Kompas: Android biasanya langsung jalan, tapi kita pastikan event listener aktif
-        if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
-          // iOS only, Android skip
-          DeviceOrientationEvent.requestPermission().catch(console.warn);
-        }
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const userLat = pos.coords.latitude;
+          const userLon = pos.coords.longitude;
+          arObjects.forEach(obj => {
+            const distance = haversineKm(userLat, userLon, obj.lat, obj.lon);
+            if (distance < 10) ensureEntity(obj);
+          });
+        }, err => {
+          alert("Gagal mengakses lokasi: " + err.message);
+        }, { enableHighAccuracy: true });
+      } else {
+        alert("Geolocation tidak didukung di perangkat ini.");
       }
 
-      startBtn.addEventListener("click", requestPermissionsAndStart);
-    </script>
-  </body>
+      setTimeout(() => {
+        loadingScreen.classList.add("hidden");
+        menu.classList.remove("hidden");
+      }, 2000);
+    }
+
+    startBtn.addEventListener("click", startExperience);
+  </script>
+</body>
 </html>
