@@ -11,7 +11,10 @@
     <script src="https://raw.githack.com/jeromeetienne/AR.js/master/aframe/build/aframe-ar.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * { box-sizing: border-box; }
+        * { 
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
         html, body { 
             margin: 0; 
             padding: 0; 
@@ -50,16 +53,68 @@
         }
         .ui-overlay > * { pointer-events: auto; }
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .ar-object { 
-            position: absolute; 
-            background: rgba(255, 255, 255, 0.9); 
-            padding: 10px; 
-            border-radius: 8px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            transform: translate(-50%, -50%);
-            max-width: 200px;
+        
+        /* Loading Styles */
+        .camera-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
             text-align: center;
+            padding: 20px;
         }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #667eea;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .progress-container {
+            width: 80%;
+            max-width: 300px;
+            margin-top: 20px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .retry-button {
+            margin-top: 20px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            display: none;
+        }
+        
+        /* Navigation UI Styles */
         .navigation-overlay {
             position: fixed;
             top: 50%;
@@ -96,23 +151,8 @@
             font-size: clamp(12px, 3.5vw, 16px);
             max-width: 90vw;
         }
-        .pulse-ring {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 120px;
-            height: 120px;
-            border: 3px solid #4285f4;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-            opacity: 0.6;
-        }
-        @keyframes pulse {
-            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.8; }
-            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.4; }
-            100% { transform: translate(-50%, -50%) scale(1.3); opacity: 0; }
-        }
+        
+        /* Compass Styles */
         .compass-ring {
             position: fixed;
             top: clamp(80px, 20vh, 100px);
@@ -137,51 +177,77 @@
             transform: translate(-50%, -100%);
             transition: transform 0.3s ease;
         }
-        .loading-spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .camera-loading {
+        
+        /* Modal Styles */
+        .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 100;
-            color: white;
+            padding: 20px;
         }
-        .camera-loading p {
-            margin-top: 20px;
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .modal-header {
+            padding: 16px;
+            border-bottom: 1px solid #eee;
+            font-weight: bold;
             font-size: 18px;
         }
-        .android-fix {
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
+        .modal-body {
+            padding: 16px;
+        }
+        .modal-footer {
+            padding: 16px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .modal-button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .modal-button-primary {
+            background: #667eea;
+            color: white;
+        }
+        .modal-button-secondary {
+            background: #eee;
+            color: #333;
         }
     </style>
 </head>
-<body class="bg-gray-100 android-fix">
-    <!-- Loading Camera -->
-    <div id="cameraLoading" class="camera-loading">
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="camera-loading">
         <div class="loading-spinner"></div>
-        <p>Menyiapkan kamera...</p>
+        <div id="loadingMessage">Menyiapkan aplikasi...</div>
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <div id="progressText">0%</div>
+        </div>
+        <button id="retryButton" class="retry-button">Coba Lagi</button>
     </div>
 
     <!-- Halaman Awal -->
-    <div id="homePage" class="min-h-screen gradient-bg flex items-center justify-center">
+    <div id="homePage" class="min-h-screen gradient-bg flex items-center justify-center hidden">
         <div class="text-center text-white px-6">
             <div class="mb-8">
                 <h1 class="text-5xl font-bold mb-4">🌍 AR Explorer</h1>
@@ -279,32 +345,30 @@
     </div>
 
     <!-- Modal Bantuan -->
-    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-2 sm:p-4">
-        <div class="bg-white rounded-lg max-w-md w-full max-h-[80vh] sm:max-h-96 overflow-y-auto mx-2">
-            <div class="p-4 sm:p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg sm:text-xl font-bold">📍 Objek Tersedia</h3>
-                    <button id="closeHelpBtn" class="text-gray-500 hover:text-gray-700 text-2xl min-h-[44px] min-w-[44px] flex items-center justify-center">×</button>
-                </div>
+    <div id="helpModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">📍 Objek Tersedia</div>
+            <div class="modal-body">
                 <div id="objectList" class="space-y-3">
                     <!-- Akan diisi dengan JavaScript -->
                 </div>
+            </div>
+            <div class="modal-footer">
+                <button id="closeHelpBtn" class="modal-button modal-button-secondary">Tutup</button>
             </div>
         </div>
     </div>
 
     <!-- Modal Izin -->
-    <div id="permissionModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-2 sm:p-4">
-        <div class="bg-white rounded-lg max-w-md w-full p-4 sm:p-6 text-center mx-2">
-            <h3 class="text-lg sm:text-xl font-bold mb-4">🔐 Izin Diperlukan</h3>
-            <p class="text-gray-600 mb-6 text-sm sm:text-base">Aplikasi memerlukan akses kamera dan lokasi untuk fitur AR</p>
-            <div class="space-y-3">
-                <button id="grantPermissionBtn" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors min-h-[44px] text-sm sm:text-base">
-                    Berikan Izin
-                </button>
-                <button id="cancelPermissionBtn" class="w-full bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition-colors min-h-[44px] text-sm sm:text-base">
-                    Batal
-                </button>
+    <div id="permissionModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">🔐 Izin Diperlukan</div>
+            <div class="modal-body">
+                <p>Aplikasi memerlukan akses kamera dan lokasi untuk fitur AR. Silakan berikan izin saat diminta.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelPermissionBtn" class="modal-button modal-button-secondary">Batal</button>
+                <button id="grantPermissionBtn" class="modal-button modal-button-primary">Berikan Izin</button>
             </div>
         </div>
     </div>
@@ -320,8 +384,14 @@
         let deviceOrientation = 0;
         let compassHeading = 0;
         let cameraStream = null;
+        let isAndroid = /android/i.test(navigator.userAgent);
 
         // DOM elements
+        const loadingScreen = document.getElementById('loadingScreen');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const retryButton = document.getElementById('retryButton');
         const homePage = document.getElementById('homePage');
         const arPage = document.getElementById('arPage');
         const exploreBtn = document.getElementById('exploreBtn');
@@ -335,11 +405,36 @@
         const statusInfo = document.getElementById('statusInfo');
         const distanceInfo = document.getElementById('distanceInfo');
         const objectList = document.getElementById('objectList');
-        const cameraLoading = document.getElementById('cameraLoading');
+
+        // Update loading UI
+        function updateLoading(message, progress = 0) {
+            loadingMessage.textContent = message;
+            progressFill.style.width = `${progress}%`;
+            progressText.textContent = `${progress}%`;
+            
+            if (progress >= 100) {
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                }, 500);
+            }
+        }
+
+        // Show error and retry button
+        function showError(message) {
+            loadingMessage.textContent = message;
+            retryButton.classList.remove('hidden');
+        }
+
+        // Hide loading screen and show home page
+        function showHomePage() {
+            loadingScreen.classList.add('hidden');
+            homePage.classList.remove('hidden');
+        }
 
         // Load data from CSV
         async function loadCSVData() {
             try {
+                updateLoading('Memuat data lokasi...', 10);
                 const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCPrAyjTP4O7lSWJnouA4Ysnd5U88mcM-dWyJG0Nv9eWOA3yVKrGJ1-5G_QDdEcTNpwn0F5XbzeUJh/pub?gid=0&single=true&output=csv';
                 const response = await fetch(csvUrl);
                 const csvText = await response.text();
@@ -347,7 +442,7 @@
                 const lines = csvText.split('\n');
                 const objects = [];
                 
-                for (let i = 1; i < lines.length; i++) { // Skip header
+                for (let i = 1; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (line) {
                         const [name, lat, lon, url] = line.split(',').map(item => item.trim());
@@ -363,8 +458,9 @@
                 }
                 
                 arObjects = objects;
-                console.log('Loaded objects:', arObjects);
+                updateLoading('Data lokasi dimuat', 20);
                 updateObjectList();
+                showHomePage();
             } catch (error) {
                 console.error('Error loading CSV data:', error);
                 // Fallback data
@@ -373,6 +469,7 @@
                     { name: 'Bundaran HI', lat: -6.1944, lon: 106.8229, url: 'https://example.com/hi' }
                 ];
                 updateObjectList();
+                showHomePage();
             }
         }
 
@@ -381,7 +478,7 @@
             objectList.innerHTML = '';
             arObjects.forEach((obj, index) => {
                 const div = document.createElement('div');
-                div.className = 'p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors min-h-[44px] flex flex-col justify-center';
+                div.className = 'p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200 transition-colors min-h-[44px] flex flex-col justify-center';
                 div.innerHTML = `
                     <div class="font-semibold text-sm sm:text-base truncate">${obj.name}</div>
                     <div class="text-xs sm:text-sm text-gray-600 truncate">Lat: ${obj.lat.toFixed(4)}, Lon: ${obj.lon.toFixed(4)}</div>
@@ -509,59 +606,139 @@
             return R * c;
         }
 
-        // Request permissions
-        async function requestPermissions() {
+        // Check camera support
+        async function checkCameraSupport() {
             try {
-                // Request camera permission first
+                updateLoading('Memeriksa kamera...', 30);
+                
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Browser tidak mendukung akses kamera');
+                }
+                
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const hasCamera = devices.some(device => device.kind === 'videoinput');
+                
+                if (!hasCamera) {
+                    throw new Error('Tidak ditemukan kamera');
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Camera check failed:', error);
+                showError(`Error kamera: ${error.message}`);
+                throw error;
+            }
+        }
+
+        // Request camera access with timeout
+        async function requestCameraAccess() {
+            return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('Timeout: Kamera tidak merespon'));
+                }, 15000); // 15 detik timeout
+
+                updateLoading('Mengakses kamera...', 40);
+                
                 const constraints = {
                     video: {
                         facingMode: 'environment',
                         width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        frameRate: { ideal: 30 }
+                        height: { ideal: 720 }
                     }
                 };
+
+                // Try back camera first
+                navigator.mediaDevices.getUserMedia(constraints)
+                    .then(stream => {
+                        clearTimeout(timeout);
+                        resolve(stream);
+                    })
+                    .catch(backError => {
+                        console.log('Mencoba kamera depan...');
+                        
+                        // Fallback to front camera
+                        constraints.video.facingMode = 'user';
+                        navigator.mediaDevices.getUserMedia(constraints)
+                            .then(stream => {
+                                clearTimeout(timeout);
+                                resolve(stream);
+                            })
+                            .catch(frontError => {
+                                clearTimeout(timeout);
+                                reject(new Error('Tidak dapat mengakses kamera depan maupun belakang'));
+                            });
+                    });
+            });
+        }
+
+        // Request location permission
+        async function requestLocationPermission() {
+            return new Promise((resolve, reject) => {
+                updateLoading('Meminta izin lokasi...', 60);
                 
-                // Show camera loading
-                cameraLoading.classList.remove('hidden');
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        userLocation = {
+                            lat: position.coords.latitude,
+                            lon: position.coords.longitude
+                        };
+                        resolve(position);
+                    },
+                    error => {
+                        console.error('Location error:', error);
+                        reject(error);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            });
+        }
+
+        // Start AR experience
+        async function startAR() {
+            try {
+                // Reset UI
+                retryButton.classList.add('hidden');
+                loadingScreen.classList.remove('hidden');
                 
-                // Get camera stream
-                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                // Step 1: Check camera support
+                await checkCameraSupport();
                 
-                // Hide camera loading after a short delay
-                setTimeout(() => {
-                    cameraLoading.classList.add('hidden');
-                }, 1000);
+                // Step 2: Request camera access
+                cameraStream = await requestCameraAccess();
+                cameraStream.getTracks().forEach(track => track.stop());
                 
-                // Then request location permission
-                return new Promise((resolve, reject) => {
-                    statusInfo.innerHTML = `
-                        <div class="flex items-center space-x-2">
-                            <div class="loading-spinner"></div>
-                            <span>Mendapatkan lokasi...</span>
-                        </div>
-                    `;
-                    
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            userLocation = {
-                                lat: position.coords.latitude,
-                                lon: position.coords.longitude
-                            };
-                            resolve(true);
-                        },
-                        (error) => {
-                            console.error('Location error:', error);
-                            reject(error);
-                        },
-                        { enableHighAccuracy: true, timeout: 10000 }
-                    );
-                });
+                // Step 3: Request location permission
+                await requestLocationPermission();
+                
+                // Step 4: Initialize AR
+                updateLoading('Menyiapkan AR...', 80);
+                homePage.classList.add('hidden');
+                arPage.classList.remove('hidden');
+                initializeAR();
+                
+                updateLoading('Siap!', 100);
             } catch (error) {
-                console.error('Permission error:', error);
-                cameraLoading.classList.add('hidden');
-                throw error;
+                console.error('AR initialization failed:', error);
+                showError(`Gagal: ${error.message}`);
+                
+                // Clean up if any partial resources were acquired
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                }
             }
+        }
+
+        // Initialize AR components
+        function initializeAR() {
+            arScene = document.getElementById('arScene');
+            arCamera = document.getElementById('arCamera');
+            
+            // Wait for A-Frame to be ready
+            arScene.addEventListener('loaded', () => {
+                console.log('AR Scene loaded');
+                startLocationTracking();
+                requestOrientationPermission();
+            });
         }
 
         // Start location tracking
@@ -597,35 +774,7 @@
             }
         }
 
-        // Start device orientation tracking
-        function startOrientationTracking() {
-            if (window.DeviceOrientationEvent) {
-                window.addEventListener('deviceorientation', (event) => {
-                    // Get compass heading
-                    let heading = event.alpha;
-                    if (heading !== null) {
-                        // Convert to 0-360 range
-                        compassHeading = (360 - heading) % 360;
-                        deviceOrientation = compassHeading;
-                        
-                        // Update compass needle
-                        const compassNeedle = document.getElementById('compassNeedle');
-                        if (compassNeedle) {
-                            compassNeedle.style.transform = `translate(-50%, -100%) rotate(${compassHeading}deg)`;
-                        }
-                        
-                        // Update navigation if active
-                        if (currentNavigation) {
-                            updateNavigationDisplay();
-                        }
-                    }
-                });
-            } else {
-                console.log('Device orientation not supported');
-            }
-        }
-
-        // Request device orientation permission (iOS 13+)
+        // Request device orientation permission
         async function requestOrientationPermission() {
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 try {
@@ -638,6 +787,28 @@
                 }
             } else {
                 startOrientationTracking();
+            }
+        }
+
+        // Start orientation tracking
+        function startOrientationTracking() {
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', (event) => {
+                    let heading = event.alpha;
+                    if (heading !== null) {
+                        compassHeading = (360 - heading) % 360;
+                        deviceOrientation = compassHeading;
+                        
+                        const compassNeedle = document.getElementById('compassNeedle');
+                        if (compassNeedle) {
+                            compassNeedle.style.transform = `translate(-50%, -100%) rotate(${compassHeading}deg)`;
+                        }
+                        
+                        if (currentNavigation) {
+                            updateNavigationDisplay();
+                        }
+                    }
+                });
             }
         }
 
@@ -692,17 +863,14 @@
             }
         }
 
-        // Initialize AR
-        function initializeAR() {
-            arScene = document.getElementById('arScene');
-            arCamera = document.getElementById('arCamera');
-            
-            // Wait for A-Frame to be ready
-            arScene.addEventListener('loaded', () => {
-                console.log('AR Scene loaded');
-                startLocationTracking();
-                requestOrientationPermission();
-            });
+        // Clean up resources
+        function cleanupResources() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
         }
 
         // Event listeners
@@ -711,41 +879,21 @@
         });
 
         grantPermissionBtn.addEventListener('click', async () => {
-            try {
-                permissionModal.classList.add('hidden');
-                statusInfo.innerHTML = `
-                    <div class="flex items-center space-x-2">
-                        <div class="loading-spinner"></div>
-                        <span>Meminta izin...</span>
-                    </div>
-                `;
-                
-                await requestPermissions();
-                
-                homePage.classList.add('hidden');
-                arPage.classList.remove('hidden');
-                
-                setTimeout(() => {
-                    initializeAR();
-                }, 1000);
-                
-            } catch (error) {
-                alert('Izin diperlukan untuk menggunakan fitur AR. Silakan coba lagi.');
-                permissionModal.classList.remove('hidden');
-            }
+            permissionModal.classList.add('hidden');
+            await startAR();
         });
 
         cancelPermissionBtn.addEventListener('click', () => {
             permissionModal.classList.add('hidden');
         });
 
+        retryButton.addEventListener('click', async () => {
+            retryButton.classList.add('hidden');
+            await startAR();
+        });
+
         backBtn.addEventListener('click', () => {
-            if (watchId) {
-                navigator.geolocation.clearWatch(watchId);
-            }
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => track.stop());
-            }
+            cleanupResources();
             arPage.classList.add('hidden');
             homePage.classList.remove('hidden');
         });
@@ -758,7 +906,6 @@
             helpModal.classList.add('hidden');
         });
 
-        // Navigation control events
         document.getElementById('stopNavBtn').addEventListener('click', () => {
             stopNavigation();
         });
@@ -784,20 +931,30 @@
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', () => {
-            loadCSVData();
-            
-            // Android-specific optimizations
-            if (/android/i.test(navigator.userAgent)) {
+            // Android specific optimizations
+            if (isAndroid) {
+                console.log('Perangkat Android terdeteksi');
                 document.body.classList.add('android-fix');
             }
+            
+            // Start loading data
+            loadCSVData();
         });
 
         // Handle page visibility changes
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden && watchId) {
-                navigator.geolocation.clearWatch(watchId);
-            } else if (!document.hidden && arPage.style.display !== 'none') {
-                startLocationTracking();
+            if (document.hidden) {
+                if (watchId) {
+                    navigator.geolocation.clearWatch(watchId);
+                }
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                }
+            } else if (arPage.style.display !== 'none') {
+                if (!watchId) {
+                    startLocationTracking();
+                }
+                startAR();
             }
         });
     </script>
