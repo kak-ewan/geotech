@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -282,6 +282,66 @@
             justify-content: center;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             cursor: pointer;
+        }
+        .place-button {
+            position: absolute;
+            bottom: 80px;
+            right: 20px;
+            z-index: 1000;
+            background-color: #10b981;
+            color: white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .place-button:hover {
+            background-color: #059669;
+            transform: scale(1.05);
+        }
+        .coordinate-display {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 2000;
+            max-width: 90%;
+            width: 400px;
+        }
+        .coordinate-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .coordinate-item:last-child {
+            border-bottom: none;
+        }
+        .copy-button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .copy-button:hover {
+            background-color: #2563eb;
+        }
+        .copy-button.copied {
+            background-color: #10b981;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
@@ -651,13 +711,11 @@
         <div id="loading-screen" class="mode-selection min-h-screen flex flex-col items-center justify-center p-6 text-white">
             <div class="text-center mb-12">
                 <h1 class="text-4xl font-bold mb-2">GeoAR Learning</h1>
-                <p class="text-xl opacity-90">Loading AR content...</p>
+                <p class="text-xl opacity-90">Memuat konten AR...</p>
             </div>
             <div class="spinner mb-4"></div>
-            <p id="loading-status" class="text-lg opacity-80">Fetching data from server...</p>
+            <p id="loading-status" class="text-lg opacity-80">Mengambil data dari server...</p>
         </div>
-
-
 
         <!-- Student Mode -->
         <div id="student-mode" class="hidden min-h-screen bg-gray-100">
@@ -686,6 +744,12 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </div>
+                        <div class="control-button" onclick="showPlaceMenu()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </div>
                     </div>
                     
                     <!-- Compass - moved below back button -->
@@ -701,25 +765,25 @@
                     
                     <!-- Distance indicator -->
                     <div class="absolute bottom-20 left-0 right-0 text-center text-white text-lg font-semibold" id="distance-indicator">
-                        Finding nearby content...
+                        Mencari konten terdekat...
                     </div>
                     
                     <!-- Debug info -->
                     <div class="debug-info" id="debug-info">
-                        Heading: 0°<br>
+                        Arah: 0°<br>
                         Target: N/A<br>
                         Bearing: N/A
                     </div>
                     
                     <!-- AR View Mode Toggle -->
                     <div class="ar-view-mode-toggle" onclick="toggleARViewMode()">
-                        <span id="ar-view-mode-text">AR View: Real-world</span>
+                        <span id="ar-view-mode-text">Tampilan AR: Dunia Nyata</span>
                     </div>
                 </div>
                 
                 <!-- Calibration button -->
                 <button onclick="showCalibration()" class="absolute bottom-20 right-4 bg-white text-blue-600 px-4 py-2 rounded-lg shadow-md">
-                    Calibrate Compass
+                    Kalibrasi Kompas
                 </button>
             </div>
             
@@ -742,6 +806,14 @@
                     </svg>
                 </div>
                 
+                <!-- Place button -->
+                <div class="place-button" onclick="showPlaceMenu()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </div>
+                
                 <!-- Location button -->
                 <div class="location-button" id="student-use-current-location">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -755,7 +827,7 @@
             <div id="content-list-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center">
                 <div class="bg-white rounded-t-xl w-full max-w-md max-h-[70vh] overflow-hidden">
                     <div class="p-4 border-b border-gray-200 flex justify-between items-center">
-                        <h3 class="text-lg font-semibold">Nearby AR Content</h3>
+                        <h3 class="text-lg font-semibold">Konten AR Terdekat</h3>
                         <button onclick="hideContentList()" class="text-gray-500">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -765,25 +837,55 @@
                     <div class="content-list p-4" id="nearby-content-list">
                         <!-- Content will be added here dynamically -->
                         <div class="text-center py-8 text-gray-500">
-                            No AR content nearby
+                            Tidak ada konten AR terdekat
                         </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Place Menu Modal -->
+            <div id="place-menu-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                <div class="coordinate-display">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">Koordinat Lokasi Saat Ini</h3>
+                        <button onclick="hidePlaceMenu()" class="text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-2" id="coordinate-list">
+                        <div class="text-center py-8 text-gray-500">
+                            Mendapatkan lokasi...
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <p class="text-sm text-blue-800">
+                            <strong>Cara menggunakan:</strong><br>
+                            1. Berdiri di lokasi yang ingin dijadikan titik AR<br>
+                            2. Klik tombol "Salin" pada koordinat yang diinginkan<br>
+                            3. Tempel koordinat tersebut ke spreadsheet Anda<br>
+                            4. Format: nama, lat, lon, url
+                        </p>
                     </div>
                 </div>
             </div>
             
             <!-- Compass Calibration Modal -->
             <div id="calibration-overlay" class="hidden calibration-overlay">
-                <h2 class="text-2xl font-bold mb-2">Calibrate Your Compass</h2>
-                <p class="mb-4">For accurate AR positioning, please rotate your device in a figure-8 pattern</p>
+                <h2 class="text-2xl font-bold mb-2">Kalibrasi Kompas Anda</h2>
+                <p class="mb-4">Untuk posisi AR yang akurat, silakan putar perangkat Anda dalam pola angka 8</p>
                 
                 <div class="calibration-animation">
                     <div class="calibration-phone"></div>
                 </div>
                 
-                <p class="mb-6">Continue rotating until the animation completes</p>
+                <p class="mb-6">Terus putar hingga animasi selesai</p>
                 
                 <button onclick="finishCalibration()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-all">
-                    I've Completed Calibration
+                    Saya Sudah Selesai Kalibrasi
                 </button>
             </div>
         </div>
@@ -846,7 +948,7 @@
             const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCPrAyjTP4O7lSWJnouA4Ysnd5U88mcM-dWyJG0Nv9eWOA3yVKrGJ1-5G_QDdEcTNpwn0F5XbzeUJh/pub?gid=0&single=true&output=csv';
             
             try {
-                document.getElementById('loading-status').textContent = 'Fetching data from server...';
+                document.getElementById('loading-status').textContent = 'Mengambil data dari server...';
                 
                 const response = await fetch(csvUrl);
                 if (!response.ok) {
@@ -854,20 +956,20 @@
                 }
                 
                 const csvText = await response.text();
-                document.getElementById('loading-status').textContent = 'Processing AR content...';
+                document.getElementById('loading-status').textContent = 'Memproses konten AR...';
                 
                 // Parse CSV data
                 const lines = csvText.trim().split('\n');
                 const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
                 
                 // Find column indices
-                const nameIndex = headers.findIndex(h => h.includes('name') || h.includes('title'));
+                const nameIndex = headers.findIndex(h => h.includes('name') || h.includes('title') || h.includes('nama'));
                 const latIndex = headers.findIndex(h => h.includes('lat'));
                 const lonIndex = headers.findIndex(h => h.includes('lon') || h.includes('lng'));
                 const urlIndex = headers.findIndex(h => h.includes('url'));
                 
                 if (nameIndex === -1 || latIndex === -1 || lonIndex === -1 || urlIndex === -1) {
-                    throw new Error('Required columns not found in CSV. Expected: name, lat, lon, url');
+                    throw new Error('Kolom yang diperlukan tidak ditemukan dalam CSV. Diharapkan: name, lat, lon, url');
                 }
                 
                 // Clear existing AR contents
@@ -920,7 +1022,7 @@
                     }
                 }
                 
-                document.getElementById('loading-status').textContent = `Loaded ${arContents.length} AR locations!`;
+                document.getElementById('loading-status').textContent = `Memuat ${arContents.length} lokasi AR!`;
                 
                 // Save to localStorage for offline use
                 saveARContentsToStorage();
@@ -935,14 +1037,14 @@
                 
             } catch (error) {
                 console.error('Error loading CSV data:', error);
-                document.getElementById('loading-status').textContent = 'Error loading data. Using offline content...';
+                document.getElementById('loading-status').textContent = 'Gagal memuat data. Menggunakan konten offline...';
                 
                 // Try to load from localStorage as fallback
                 loadARContents();
                 
                 // If no offline content, show error
                 if (arContents.length === 0) {
-                    document.getElementById('loading-status').textContent = 'No AR content available. Please check your connection.';
+                    document.getElementById('loading-status').textContent = 'Tidak ada konten AR tersedia. Silakan periksa koneksi Anda.';
                     setTimeout(() => {
                         location.reload();
                     }, 3000);
@@ -957,8 +1059,6 @@
             }
         }
 
-
-        
         // Get current location
         function getCurrentLocation(centerMap = false) {
             navigator.geolocation.getCurrentPosition(
@@ -982,7 +1082,7 @@
                 },
                 (error) => {
                     console.error('Error getting location:', error);
-                    alert('Unable to get your location. Please enable location services.');
+                    alert('Tidak dapat mendapatkan lokasi Anda. Silakan aktifkan layanan lokasi.');
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
@@ -1034,15 +1134,13 @@
         function getContentTypeIcon(type) {
             switch (type) {
                 case 'text': return 'T';
-                case 'image': return 'I';
+                case 'image': return 'G';
                 case '3d': return '3D';
                 case 'video': return 'V';
                 case 'presentation': return 'P';
                 default: return '?';
             }
         }
-
-
 
         // Truncate text
         function truncateText(text, maxLength) {
@@ -1097,10 +1195,10 @@
                     })
                     .catch(error => {
                         console.error('Error accessing camera:', error);
-                        alert('Unable to access camera. Please allow camera access.');
+                        alert('Tidak dapat mengakses kamera. Silakan izinkan akses kamera.');
                     });
             } else {
-                alert('Your browser does not support camera access.');
+                alert('Browser Anda tidak mendukung akses kamera.');
             }
         }
 
@@ -1139,7 +1237,7 @@
                     { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
                 );
             } else {
-                alert('Geolocation is not supported by your browser.');
+                alert('Geolokasi tidak didukung oleh browser Anda.');
             }
         }
 
@@ -1150,7 +1248,7 @@
                     window.addEventListener('deviceorientation', handleOrientation);
                 }
             } else {
-                alert('Device orientation is not supported by your browser.');
+                alert('Orientasi perangkat tidak didukung oleh browser Anda.');
             }
         }
         
@@ -1216,6 +1314,91 @@
             }
         }
 
+        // Show place menu
+        function showPlaceMenu() {
+            document.getElementById('place-menu-modal').classList.remove('hidden');
+            updateCoordinateDisplay();
+        }
+
+        // Hide place menu
+        function hidePlaceMenu() {
+            document.getElementById('place-menu-modal').classList.add('hidden');
+        }
+
+        // Update coordinate display
+        function updateCoordinateDisplay() {
+            const coordinateList = document.getElementById('coordinate-list');
+            
+            if (!currentPosition) {
+                coordinateList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        Mendapatkan lokasi...
+                    </div>
+                `;
+                return;
+            }
+            
+            const lat = currentPosition.lat;
+            const lng = currentPosition.lng;
+            const accuracy = currentPosition.accuracy;
+            
+            coordinateList.innerHTML = `
+                <div class="coordinate-item">
+                    <div>
+                        <strong>Latitude:</strong><br>
+                        <span class="text-sm text-gray-600">${lat.toFixed(6)}</span>
+                    </div>
+                    <button class="copy-button" onclick="copyToClipboard('${lat.toFixed(6)}', this)">Salin</button>
+                </div>
+                
+                <div class="coordinate-item">
+                    <div>
+                        <strong>Longitude:</strong><br>
+                        <span class="text-sm text-gray-600">${lng.toFixed(6)}</span>
+                    </div>
+                    <button class="copy-button" onclick="copyToClipboard('${lng.toFixed(6)}', this)">Salin</button>
+                </div>
+                
+                <div class="coordinate-item">
+                    <div>
+                        <strong>Koordinat Lengkap:</strong><br>
+                        <span class="text-sm text-gray-600">${lat.toFixed(6)}, ${lng.toFixed(6)}</span>
+                    </div>
+                    <button class="copy-button" onclick="copyToClipboard('${lat.toFixed(6)}, ${lng.toFixed(6)}', this)">Salin</button>
+                </div>
+                
+                <div class="coordinate-item">
+                    <div>
+                        <strong>Format CSV:</strong><br>
+                        <span class="text-sm text-gray-600">Nama Konten, ${lat.toFixed(6)}, ${lng.toFixed(6)}, URL</span>
+                    </div>
+                    <button class="copy-button" onclick="copyToClipboard('Nama Konten, ${lat.toFixed(6)}, ${lng.toFixed(6)}, URL', this)">Salin</button>
+                </div>
+                
+                <div class="mt-3 text-xs text-gray-500">
+                    Akurasi: ±${Math.round(accuracy)}m
+                </div>
+            `;
+        }
+
+        // Copy to clipboard function
+        function copyToClipboard(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Change button appearance temporarily
+                const originalText = button.textContent;
+                button.textContent = 'Tersalin!';
+                button.classList.add('copied');
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                alert('Gagal menyalin ke clipboard');
+            });
+        }
+
         // Update student map markers
         function updateStudentMapMarkers() {
             // Clear existing markers
@@ -1272,7 +1455,7 @@
                     updateDirectionArrow();
                     
                     // Show notification
-                    alert(`Navigating to: ${content.title}`);
+                    alert(`Navigasi ke: ${content.title}`);
                     
                     // Switch to camera view
                     toggleView('camera');
@@ -1324,14 +1507,14 @@
             // Update distance indicator
             const distanceIndicator = document.getElementById('distance-indicator');
             if (closestContent) {
-                distanceIndicator.textContent = `${closestContent.title}: ${Math.round(closestContent.distance)}m away`;
+                distanceIndicator.textContent = `${closestContent.title}: ${Math.round(closestContent.distance)}m`;
                 
                 // If no target is set, set closest as target
                 if (!targetARContent) {
                     targetARContent = closestContent;
                 }
             } else {
-                distanceIndicator.textContent = 'No AR content nearby';
+                distanceIndicator.textContent = 'Tidak ada konten AR terdekat';
             }
             
             // Update nearby content list
@@ -1368,7 +1551,7 @@
                     
                     // Show different text based on box state
                     if (!isBoxOpened) {
-                        indicator.textContent = canOpenBox ? '🎁 Open Box' : '🎁 Mystery Box';
+                        indicator.textContent = canOpenBox ? '🎁 Buka Kotak' : '🎁 Kotak Misterius';
                         indicator.style.backgroundColor = canOpenBox ? 'rgba(255, 215, 0, 0.9)' : 'rgba(139, 69, 19, 0.9)';
                         indicator.style.color = canOpenBox ? '#8B4513' : 'white';
                     } else {
@@ -1416,7 +1599,7 @@
                             } else if (isBoxOpened) {
                                 showARContent(content);
                             } else {
-                                alert(`You need to be within ${boxOpenDistance}m to open this treasure box. Current distance: ${Math.round(content.distance)}m`);
+                                alert(`Anda perlu berada dalam jarak ${boxOpenDistance}m untuk membuka kotak harta karun ini. Jarak saat ini: ${Math.round(content.distance)}m`);
                             }
                         });
                         
@@ -1530,7 +1713,7 @@
                         if (canOpenBox) {
                             const openButton = document.createElement('button');
                             openButton.className = 'open-box-button';
-                            openButton.textContent = 'Open Box';
+                            openButton.textContent = 'Buka Kotak';
                             openButton.addEventListener('click', (e) => {
                                 e.stopPropagation();
                                 openTreasureBox(content.id);
@@ -1539,7 +1722,7 @@
                         } else {
                             const distanceReq = document.createElement('div');
                             distanceReq.className = 'distance-requirement';
-                            distanceReq.textContent = `Get within ${boxOpenDistance}m`;
+                            distanceReq.textContent = `Dekati dalam ${boxOpenDistance}m`;
                             contentElement.appendChild(distanceReq);
                         }
                     } else {
@@ -1585,7 +1768,7 @@
                     // Add title label
                     const label = document.createElement('div');
                     label.className = 'ar-object-label';
-                    label.textContent = isBoxOpened ? content.title : '🎁 Mystery Box';
+                    label.textContent = isBoxOpened ? content.title : '🎁 Kotak Misterius';
                     
                     // Add distance indicator
                     const distanceElement = document.createElement('div');
@@ -1627,10 +1810,10 @@
         function toggleARViewMode() {
             if (arViewMode === "realworld") {
                 arViewMode = "indicator";
-                document.getElementById('ar-view-mode-text').textContent = "AR View: Indicators";
+                document.getElementById('ar-view-mode-text').textContent = "Tampilan AR: Indikator";
             } else {
                 arViewMode = "realworld";
-                document.getElementById('ar-view-mode-text').textContent = "AR View: Real-world";
+                document.getElementById('ar-view-mode-text').textContent = "Tampilan AR: Dunia Nyata";
             }
             
             // Update AR objects with current nearby content
@@ -1692,7 +1875,7 @@
         // Update debug info
         function updateDebugInfo(bearing, relativeBearing) {
             const debugInfo = document.getElementById('debug-info');
-            let debugText = `Heading: ${Math.round(currentHeading)}°`;
+            let debugText = `Arah: ${Math.round(currentHeading)}°`;
             
             if (targetARContent) {
                 const bearing = calculateBearing(
@@ -1703,23 +1886,23 @@
                 
                 debugText += `<br>Target: ${targetARContent.title}`;
                 debugText += `<br>Bearing: ${Math.round(bearing)}°`;
-                debugText += `<br>Relative: ${Math.round(relativeBearing)}°`;
-                debugText += `<br>Distance: ${Math.round(targetARContent.distance)}m`;
+                debugText += `<br>Relatif: ${Math.round(relativeBearing)}°`;
+                debugText += `<br>Jarak: ${Math.round(targetARContent.distance)}m`;
             } else {
                 debugText += `<br>Target: N/A`;
                 debugText += `<br>Bearing: N/A`;
             }
             
             if (useAbsoluteHeading) {
-                debugText += `<br>Mode: Absolute`;
+                debugText += `<br>Mode: Absolut`;
             } else {
-                debugText += `<br>Mode: Relative`;
+                debugText += `<br>Mode: Relatif`;
                 if (compassCalibrated) {
-                    debugText += ` (Calibrated)`;
+                    debugText += ` (Terkalibrasi)`;
                 }
             }
             
-            debugText += `<br>AR View: ${arViewMode}`;
+            debugText += `<br>Tampilan AR: ${arViewMode}`;
             
             debugInfo.innerHTML = debugText;
         }
@@ -1731,7 +1914,7 @@
             if (nearbyContent.length === 0) {
                 listContainer.innerHTML = `
                     <div class="text-center py-8 text-gray-500">
-                        No AR content nearby
+                        Tidak ada konten AR terdekat
                     </div>
                 `;
                 return;
@@ -1750,21 +1933,21 @@
                 const canOpenBox = content.distance <= boxOpenDistance;
                 
                 let statusText = '';
-                let buttonText = 'View';
+                let buttonText = 'Lihat';
                 let buttonClass = 'bg-blue-600 text-white';
                 
                 if (!isBoxOpened) {
                     if (canOpenBox) {
-                        statusText = '🎁 Ready to open';
-                        buttonText = 'Open Box';
+                        statusText = '🎁 Siap dibuka';
+                        buttonText = 'Buka Kotak';
                         buttonClass = 'bg-yellow-500 text-white';
                     } else {
-                        statusText = '🔒 Locked';
-                        buttonText = 'Get Closer';
+                        statusText = '🔒 Terkunci';
+                        buttonText = 'Dekati';
                         buttonClass = 'bg-gray-400 text-white';
                     }
                 } else {
-                    statusText = '✨ Opened';
+                    statusText = '✨ Terbuka';
                 }
                 
                 item.innerHTML = `
@@ -1773,13 +1956,13 @@
                             ${isBoxOpened ? getContentTypeIcon(content.type) : '🎁'}
                         </div>
                         <div>
-                            <h4 class="font-medium text-gray-900">${isBoxOpened ? content.title : 'Mystery Box'}</h4>
-                            <p class="text-sm text-gray-500">${Math.round(content.distance)}m away • ${statusText}</p>
+                            <h4 class="font-medium text-gray-900">${isBoxOpened ? content.title : 'Kotak Misterius'}</h4>
+                            <p class="text-sm text-gray-500">${Math.round(content.distance)}m • ${statusText}</p>
                         </div>
                     </div>
                     <div class="flex space-x-2">
                         <button class="view-btn ${buttonClass} px-3 py-1 rounded-md text-sm">${buttonText}</button>
-                        <button class="navigate-btn bg-gray-200 text-gray-800 px-3 py-1 rounded-md text-sm">Navigate</button>
+                        <button class="navigate-btn bg-gray-200 text-gray-800 px-3 py-1 rounded-md text-sm">Navigasi</button>
                     </div>
                 `;
                 
@@ -1791,7 +1974,7 @@
                     } else if (isBoxOpened) {
                         showARContent(content);
                     } else {
-                        alert(`You need to be within ${boxOpenDistance}m to open this treasure box. Current distance: ${Math.round(content.distance)}m`);
+                        alert(`Anda perlu berada dalam jarak ${boxOpenDistance}m untuk membuka kotak harta karun ini. Jarak saat ini: ${Math.round(content.distance)}m`);
                     }
                 });
                 
@@ -1864,7 +2047,7 @@
             }
             
             if (slideCounter) {
-                slideCounter.textContent = `Slide ${currentIndex + 1} of ${slides.length}`;
+                slideCounter.textContent = `Slide ${currentIndex + 1} dari ${slides.length}`;
             }
             
             // Update button states
@@ -1883,7 +2066,7 @@
             
             // Check if user is close enough
             if (content.distance > boxOpenDistance) {
-                alert(`You need to be within ${boxOpenDistance}m to open this treasure box. Current distance: ${Math.round(content.distance)}m`);
+                alert(`Anda perlu berada dalam jarak ${boxOpenDistance}m untuk membuka kotak harta karun ini. Jarak saat ini: ${Math.round(content.distance)}m`);
                 return;
             }
             
@@ -1968,11 +2151,11 @@
                             <!-- Initial slide will be loaded here -->
                         </div>
                         <div id="slide-counter-${content.id}" class="slide-counter">
-                            Slide 1 of ${slides.length}
+                            Slide 1 dari ${slides.length}
                         </div>
                         <div class="presentation-controls mt-4">
-                            <button id="prev-slide-${content.id}" class="prev-slide" disabled>Previous</button>
-                            <button id="next-slide-${content.id}" class="next-slide" ${slides.length <= 1 ? 'disabled' : ''}>Next</button>
+                            <button id="prev-slide-${content.id}" class="prev-slide" disabled>Sebelumnya</button>
+                            <button id="next-slide-${content.id}" class="next-slide" ${slides.length <= 1 ? 'disabled' : ''}>Selanjutnya</button>
                         </div>
                     </div>
                 `;
@@ -1991,12 +2174,12 @@
                     <div class="p-4">
                         ${contentHtml}
                         <div class="mt-4 text-sm text-gray-500">
-                            Distance: ${Math.round(content.distance)}m
+                            Jarak: ${Math.round(content.distance)}m
                         </div>
                     </div>
                     <div class="p-4 border-t border-gray-200">
                         <button class="navigate-btn w-full bg-blue-600 text-white py-2 rounded-lg">
-                            Navigate to this location
+                            Navigasi ke lokasi ini
                         </button>
                     </div>
                 </div>
@@ -2065,5 +2248,5 @@
         // Initialize the app when the page loads
         window.onload = initApp;
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c11db8f5e7e787',t:'MTc1NDY3ODE1My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c1407817c1b4ac',t:'MTc1NDY3OTU3Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
