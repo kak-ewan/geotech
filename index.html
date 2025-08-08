@@ -2,30 +2,50 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>AR Lokasi - Dinamis dari CSV</title>
-    
-    <!-- A-Frame & AR.js -->
+    <title>AR Lokasi - Lengkap</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
-    
-    <!-- CSV Parser -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    
+
     <style>
-      body, html { margin: 0; padding: 0; overflow: hidden; font-family: sans-serif; }
-      #loading {
+      body, html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family: sans-serif;
+      }
+
+      #ui {
         position: absolute;
         top: 10px;
         left: 10px;
-        background: rgba(255,255,255,0.9);
-        padding: 10px 15px;
+        background: rgba(255,255,255,0.95);
+        padding: 10px;
         border-radius: 8px;
         z-index: 999;
+        max-width: 300px;
+      }
+
+      #placesList {
+        max-height: 200px;
+        overflow-y: auto;
+        margin-top: 5px;
+      }
+
+      #placesList div {
+        padding: 4px 0;
+        border-bottom: 1px solid #ddd;
       }
     </style>
   </head>
   <body>
-    <div id="loading">📡 Memuat lokasi dari spreadsheet...</div>
+
+    <div id="ui">
+      <div><strong>🔍 Cari Lokasi</strong></div>
+      <input type="text" id="searchBox" placeholder="Ketik nama lokasi..." style="width: 100%; margin-top: 5px;" />
+      <div id="placesList"></div>
+      <div id="nearest" style="margin-top: 10px; color: #444;"></div>
+    </div>
 
     <a-scene
       embedded
@@ -38,55 +58,102 @@
 
     <script>
       const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCPrAyjTP4O7lSWJnouA4Ysnd5U88mcM-dWyJG0Nv9eWOA3yVKrGJ1-5G_QDdEcTNpwn0F5XbzeUJh/pub?output=csv";
-      
-      // Default model if not provided
       const DEFAULT_MODEL = "https://cdn.glitch.global/94b64d3b-9cd0-4d73-bf40-c27c889c2748/marker.glb?v=1691549132930";
+      let places = [];
+
+      const scene = document.querySelector("a-scene");
+      const searchBox = document.getElementById("searchBox");
+      const placesList = document.getElementById("placesList");
+      const nearestBox = document.getElementById("nearest");
+
+      function toRadians(deg) {
+        return deg * Math.PI / 180;
+      }
+
+      function computeDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000; // Earth radius in meters
+        const φ1 = toRadians(lat1);
+        const φ2 = toRadians(lat2);
+        const Δφ = toRadians(lat2 - lat1);
+        const Δλ = toRadians(lon2 - lon1);
+        const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+        return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+      }
+
+      function renderPlaces(data) {
+        data.forEach(place => {
+          const lat = parseFloat(place.latitude);
+          const lon = parseFloat(place.longitude);
+          const name = place.name || "Tanpa Nama";
+          const desc = place.description || "";
+          const modelUrl = place.model || DEFAULT_MODEL;
+
+          const model = document.createElement("a-entity");
+          model.setAttribute("gps-entity-place", `latitude: ${lat}; longitude: ${lon}`);
+          model.setAttribute("gltf-model", modelUrl);
+          model.setAttribute("scale", "5 5 5");
+          model.setAttribute("look-at", "[gps-camera]");
+
+          const label = document.createElement("a-text");
+          label.setAttribute("value", `${name}\n${desc}`);
+          label.setAttribute("align", "center");
+          label.setAttribute("color", "#FFD700");
+          label.setAttribute("position", "0 3 0");
+          label.setAttribute("scale", "5 5 5");
+          label.setAttribute("look-at", "[gps-camera]");
+
+          model.appendChild(label);
+          scene.appendChild(model);
+        });
+      }
+
+      function updateList(filter = "") {
+        const lower = filter.toLowerCase();
+        placesList.innerHTML = "";
+        places
+          .filter(p => p.name.toLowerCase().includes(lower))
+          .forEach(p => {
+            const div = document.createElement("div");
+            div.innerText = p.name;
+            placesList.appendChild(div);
+          });
+      }
+
+      function showNearest(userLat, userLon) {
+        let nearest = null;
+        let minDist = Infinity;
+
+        places.forEach(p => {
+          const d = computeDistance(userLat, userLon, parseFloat(p.latitude), parseFloat(p.longitude));
+          if (d < minDist) {
+            minDist = d;
+            nearest = p;
+          }
+        });
+
+        if (nearest) {
+          nearestBox.innerText = `📍 Terdekat: ${nearest.name} (${Math.round(minDist)}m)`;
+        }
+      }
+
+      // Update saat lokasi berubah
+      window.addEventListener("gps-camera-update-position", e => {
+        const pos = e.detail.position;
+        showNearest(pos.latitude, pos.longitude);
+      });
 
       fetch(CSV_URL)
-        .then(response => response.text())
-        .then(csvText => {
-          Papa.parse(csvText, {
-            header: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-              const places = results.data;
-              const scene = document.querySelector("a-scene");
-
-              places.forEach(place => {
-                const lat = parseFloat(place.latitude);
-                const lon = parseFloat(place.longitude);
-                const name = place.name || "Tanpa Nama";
-                const desc = place.description || "";
-                const modelUrl = place.model || DEFAULT_MODEL;
-
-                // Buat model 3D
-                const model = document.createElement("a-entity");
-                model.setAttribute("gps-entity-place", `latitude: ${lat}; longitude: ${lon}`);
-                model.setAttribute("gltf-model", modelUrl);
-                model.setAttribute("scale", "5 5 5");
-                model.setAttribute("look-at", "[gps-camera]");
-
-                // Buat teks nama/deskripsi di atas model
-                const text = document.createElement("a-text");
-                text.setAttribute("value", `${name}\n${desc}`);
-                text.setAttribute("align", "center");
-                text.setAttribute("color", "#FFD700");
-                text.setAttribute("position", "0 3 0");
-                text.setAttribute("scale", "5 5 5");
-                text.setAttribute("look-at", "[gps-camera]");
-
-                model.appendChild(text);
-                scene.appendChild(model);
-              });
-
-              document.getElementById("loading").style.display = "none";
-            }
-          });
-        })
-        .catch(error => {
-          document.getElementById("loading").innerText = "❌ Gagal memuat data CSV.";
-          console.error("CSV load error:", error);
+        .then(res => res.text())
+        .then(csv => {
+          const parsed = Papa.parse(csv, { header: true, skipEmptyLines: true });
+          places = parsed.data;
+          renderPlaces(places);
+          updateList();
         });
+
+      searchBox.addEventListener("input", e => {
+        updateList(e.target.value);
+      });
     </script>
   </body>
 </html>
