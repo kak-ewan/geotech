@@ -774,6 +774,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </div>
+                        <div class="control-button" onclick="toggleDebugInfo()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
 
                     </div>
                     
@@ -793,8 +798,8 @@
                         Mencari konten terdekat...
                     </div>
                     
-                    <!-- Debug info -->
-                    <div class="debug-info" id="debug-info">
+                    <!-- Debug info - hidden by default -->
+                    <div class="debug-info hidden" id="debug-info">
                         Arah: 0°<br>
                         Target: N/A<br>
                         Bearing: N/A
@@ -808,10 +813,12 @@
 
                 </div>
                 
-                <!-- Calibration button -->
-                <button onclick="showCalibration()" class="absolute bottom-20 right-4 bg-white text-blue-600 px-4 py-2 rounded-lg shadow-md">
-                    Kalibrasi Kompas
-                </button>
+                <!-- Calibration button - moved to top right with other controls -->
+                <div class="absolute top-80 right-4 z-1000">
+                    <button onclick="showCalibration()" class="bg-white text-blue-600 px-3 py-2 rounded-lg shadow-md text-sm">
+                        📍 Kalibrasi
+                    </button>
+                </div>
             </div>
             
             <!-- Map View -->
@@ -1916,6 +1923,12 @@
             document.getElementById('content-list-modal').classList.add('hidden');
         }
 
+        // Toggle debug info visibility
+        function toggleDebugInfo() {
+            const debugInfo = document.getElementById('debug-info');
+            debugInfo.classList.toggle('hidden');
+        }
+
         // Parse presentation content
         function parsePresentationContent(content) {
             try {
@@ -2022,6 +2035,7 @@
                 contentHtml = `
                     <div class="text-center">
                         <img src="${content.content}" alt="${content.title}" class="max-w-full max-h-[300px] mx-auto rounded-lg">
+                        ${content.description ? `<div class="mt-3 p-3 bg-gray-50 rounded-lg text-left"><p class="text-sm text-gray-700">${content.description}</p></div>` : ''}
                     </div>
                 `;
             } else if (content.type === '3d') {
@@ -2052,6 +2066,7 @@
                             allowfullscreen>
                         </iframe>
                     </div>
+                    ${content.description ? `<div class="mt-3 p-3 bg-gray-50 rounded-lg text-left"><p class="text-sm text-gray-700">${content.description}</p></div>` : ''}
                 `;
             } else if (content.type === 'presentation') {
                 // Parse presentation content
@@ -2169,5 +2184,5 @@
         // Initialize the app when the page loads
         window.onload = initApp;
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c1a19465a55c61',t:'MTc1NDY4MzU1NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c1ab8ee6f4d8a3',t:'MTc1NDY4Mzk2My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
