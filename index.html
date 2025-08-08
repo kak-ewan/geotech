@@ -623,6 +623,91 @@
             border-radius: 10px;
             font-size: 10px;
         }
+        .world-anchored-object {
+            position: absolute;
+            transform-style: preserve-3d;
+            pointer-events: auto;
+            z-index: 100;
+        }
+        .world-anchored-content {
+            transform-style: preserve-3d;
+            backface-visibility: hidden;
+        }
+        .world-anchored-3d {
+            width: 200px;
+            height: 200px;
+            transform-style: preserve-3d;
+        }
+        .world-anchored-image {
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+        .world-anchored-video {
+            width: 320px;
+            height: 240px;
+            background-color: #000;
+            border-radius: 10px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        .placement-controls {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .placement-button {
+            background-color: #10b981;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 24px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+        .placement-button:hover {
+            background-color: #059669;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        .placement-button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .cancel-placement {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .cancel-placement:hover {
+            background-color: #dc2626;
+        }
+        .placement-instructions {
+            text-align: center;
+            font-size: 14px;
+            color: #374151;
+            margin-bottom: 5px;
+        }
         .ar-view-mode-toggle {
             position: absolute;
             bottom: 20px;
@@ -779,6 +864,19 @@
                     <div class="ar-view-mode-toggle" onclick="toggleARViewMode()">
                         <span id="ar-view-mode-text">Tampilan AR: Dunia Nyata</span>
                     </div>
+                    
+                    <!-- Placement Controls -->
+                    <div id="placement-controls" class="placement-controls hidden">
+                        <div class="placement-instructions">
+                            Arahkan kamera ke lokasi yang diinginkan
+                        </div>
+                        <button id="place-object-btn" class="placement-button">
+                            Taruh Objek di Sini
+                        </button>
+                        <button id="cancel-placement-btn" class="cancel-placement">
+                            Batal
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- Calibration button -->
@@ -920,6 +1018,10 @@
         let currentPresentationState = {}; // Store current slide index for presentations
         let openedBoxes = new Set(); // Track which boxes have been opened
         let boxOpenDistance = 15; // Distance in meters to allow box opening
+        let worldAnchoredObjects = new Map(); // Track objects placed in real world positions
+        let placedObjectsData = new Map(); // Store placed object data for persistence
+        let placementMode = false; // Track if we're in object placement mode
+        let pendingPlacement = null; // Store content waiting to be placed
 
         // Initialize the application
         function initApp() {
@@ -1179,9 +1281,13 @@
             // Load AR contents and opened boxes
             loadARContents();
             loadOpenedBoxes();
+            loadPlacedObjects();
             
             // Start AR rendering loop
             startARRenderingLoop();
+            
+            // Initialize placement controls
+            initializePlacementControls();
         }
 
         // Start camera
@@ -1648,6 +1754,12 @@
             const overlay = document.getElementById('ar-overlay');
             overlay.innerHTML = '';
             
+            // Don't render regular AR objects if in placement mode
+            if (placementMode) {
+                renderWorldAnchoredObjects();
+                return;
+            }
+            
             arObjects.forEach(arObject => {
                 const content = arObject.content;
                 
@@ -1804,6 +1916,9 @@
                     arObject.element = arObjectElement;
                 }
             });
+            
+            // Also render world-anchored objects
+            renderWorldAnchoredObjects();
         }
 
         // Toggle AR view mode
@@ -2092,6 +2207,9 @@
 
         // Show AR content in modal
         function showARContent(content) {
+            // Check if content can be placed in world (3D, image, or video)
+            const canBePlaced = ['3d', 'image', 'video'].includes(content.type);
+            
             // Create a modal to show the content in detail
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
@@ -2178,9 +2296,16 @@
                         </div>
                     </div>
                     <div class="p-4 border-t border-gray-200">
-                        <button class="navigate-btn w-full bg-blue-600 text-white py-2 rounded-lg">
-                            Navigasi ke lokasi ini
-                        </button>
+                        <div class="flex gap-2">
+                            <button class="navigate-btn flex-1 bg-blue-600 text-white py-2 rounded-lg">
+                                Navigasi ke lokasi ini
+                            </button>
+                            ${canBePlaced ? `
+                                <button class="place-in-world-btn flex-1 bg-green-600 text-white py-2 rounded-lg">
+                                    Taruh di Dunia Nyata
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
             `;
@@ -2197,6 +2322,14 @@
                 updateDirectionArrow();
                 document.body.removeChild(modal);
             });
+            
+            // Add placement button listener if available
+            if (canBePlaced) {
+                modal.querySelector('.place-in-world-btn').addEventListener('click', () => {
+                    document.body.removeChild(modal);
+                    enterPlacementMode(content);
+                });
+            }
             
             // Add presentation navigation listeners if needed
             if (content.type === 'presentation') {
@@ -2245,8 +2378,328 @@
             }
         }
 
+        // Initialize placement controls
+        function initializePlacementControls() {
+            const placeObjectBtn = document.getElementById('place-object-btn');
+            const cancelPlacementBtn = document.getElementById('cancel-placement-btn');
+            
+            placeObjectBtn.addEventListener('click', () => {
+                if (pendingPlacement && currentPosition) {
+                    placeObjectInWorld();
+                }
+            });
+            
+            cancelPlacementBtn.addEventListener('click', () => {
+                exitPlacementMode();
+            });
+        }
+
+        // Enter placement mode
+        function enterPlacementMode(content) {
+            placementMode = true;
+            pendingPlacement = content;
+            
+            // Show placement controls
+            document.getElementById('placement-controls').classList.remove('hidden');
+            
+            // Hide other UI elements temporarily
+            document.querySelector('.ar-view-mode-toggle').style.display = 'none';
+            document.querySelector('.direction-arrow').style.display = 'none';
+            document.getElementById('distance-indicator').style.display = 'none';
+        }
+
+        // Exit placement mode
+        function exitPlacementMode() {
+            placementMode = false;
+            pendingPlacement = null;
+            
+            // Hide placement controls
+            document.getElementById('placement-controls').classList.add('hidden');
+            
+            // Show other UI elements
+            document.querySelector('.ar-view-mode-toggle').style.display = 'flex';
+            document.querySelector('.direction-arrow').style.display = 'flex';
+            document.getElementById('distance-indicator').style.display = 'block';
+        }
+
+        // Place object in world coordinates
+        function placeObjectInWorld() {
+            if (!pendingPlacement || !currentPosition) return;
+            
+            // Calculate placement position based on current position and heading
+            // Place object 2 meters in front of user
+            const distance = 2; // meters
+            const bearing = currentHeading;
+            
+            // Convert bearing and distance to lat/lng offset
+            const earthRadius = 6371000; // Earth radius in meters
+            const lat1 = currentPosition.lat * Math.PI / 180;
+            const lon1 = currentPosition.lng * Math.PI / 180;
+            const bearingRad = bearing * Math.PI / 180;
+            
+            const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distance / earthRadius) +
+                                  Math.cos(lat1) * Math.sin(distance / earthRadius) * Math.cos(bearingRad));
+            const lon2 = lon1 + Math.atan2(Math.sin(bearingRad) * Math.sin(distance / earthRadius) * Math.cos(lat1),
+                                          Math.cos(distance / earthRadius) - Math.sin(lat1) * Math.sin(lat2));
+            
+            const placementLat = lat2 * 180 / Math.PI;
+            const placementLng = lon2 * 180 / Math.PI;
+            
+            // Create world-anchored object data
+            const worldObject = {
+                id: `placed_${pendingPlacement.id}_${Date.now()}`,
+                contentId: pendingPlacement.id,
+                content: pendingPlacement,
+                lat: placementLat,
+                lng: placementLng,
+                placedAt: Date.now(),
+                placedHeading: currentHeading,
+                height: 1.5, // Default height above ground
+                scale: 1.0
+            };
+            
+            // Store in world anchored objects
+            worldAnchoredObjects.set(worldObject.id, worldObject);
+            placedObjectsData.set(worldObject.id, worldObject);
+            
+            // Save to localStorage
+            savePlacedObjects();
+            
+            // Exit placement mode
+            exitPlacementMode();
+            
+            // Show confirmation
+            alert(`Objek "${pendingPlacement.title}" telah ditempatkan di dunia nyata!`);
+        }
+
+        // Save placed objects to localStorage
+        function savePlacedObjects() {
+            const objectsArray = Array.from(placedObjectsData.values());
+            localStorage.setItem('placedObjects', JSON.stringify(objectsArray));
+        }
+
+        // Load placed objects from localStorage
+        function loadPlacedObjects() {
+            const stored = localStorage.getItem('placedObjects');
+            if (stored) {
+                const objectsArray = JSON.parse(stored);
+                objectsArray.forEach(obj => {
+                    worldAnchoredObjects.set(obj.id, obj);
+                    placedObjectsData.set(obj.id, obj);
+                });
+            }
+        }
+
+        // Render world-anchored objects
+        function renderWorldAnchoredObjects() {
+            if (!currentPosition) return;
+            
+            const overlay = document.getElementById('ar-overlay');
+            
+            worldAnchoredObjects.forEach(worldObject => {
+                // Calculate distance to placed object
+                const distance = calculateDistance(
+                    currentPosition.lat, currentPosition.lng,
+                    worldObject.lat, worldObject.lng
+                );
+                
+                // Only render if within reasonable distance (50m)
+                if (distance > 50) return;
+                
+                // Calculate bearing to object
+                const bearing = calculateBearing(
+                    currentPosition.lat, currentPosition.lng,
+                    worldObject.lat, worldObject.lng
+                );
+                
+                // Calculate relative bearing
+                const relativeBearing = (bearing - currentHeading + 360) % 360;
+                
+                // Only show if within field of view (120 degrees)
+                if (relativeBearing < 60 || relativeBearing > 300) {
+                    // Create world-anchored object element
+                    const worldObjectElement = document.createElement('div');
+                    worldObjectElement.className = 'world-anchored-object';
+                    
+                    // Calculate horizontal position
+                    let viewportX;
+                    if (relativeBearing < 60) {
+                        viewportX = 50 + (relativeBearing / 60) * 40;
+                    } else {
+                        viewportX = 50 - ((360 - relativeBearing) / 60) * 40;
+                    }
+                    
+                    // Calculate vertical position based on height and device tilt
+                    const deviceTilt = deviceOrientation.beta || 0;
+                    const tiltAdjustment = (90 - deviceTilt) * 0.5;
+                    const viewportY = 50 - (worldObject.height * 3) - tiltAdjustment;
+                    
+                    // Calculate scale based on distance
+                    const maxDistance = 20; // Max distance for scaling
+                    const minScale = 0.1;
+                    const maxScale = 2.0;
+                    const distanceScale = Math.max(minScale, maxScale - (distance / maxDistance) * (maxScale - minScale));
+                    const totalScale = distanceScale * worldObject.scale;
+                    
+                    // Position the object
+                    worldObjectElement.style.left = `${Math.max(5, Math.min(95, viewportX))}%`;
+                    worldObjectElement.style.top = `${Math.max(5, Math.min(85, viewportY))}%`;
+                    
+                    // Create content based on type
+                    let contentElement;
+                    const content = worldObject.content;
+                    
+                    if (content.type === 'image') {
+                        contentElement = document.createElement('img');
+                        contentElement.className = 'world-anchored-image world-anchored-content';
+                        contentElement.src = content.content;
+                        contentElement.alt = content.title;
+                        contentElement.onerror = function() {
+                            this.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%234f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
+                        };
+                    } else if (content.type === '3d') {
+                        contentElement = document.createElement('div');
+                        contentElement.className = 'world-anchored-3d world-anchored-content';
+                        contentElement.innerHTML = `
+                            <model-viewer src="${content.content}" 
+                                alt="${content.title}" 
+                                auto-rotate 
+                                camera-controls 
+                                shadow-intensity="1" 
+                                ar 
+                                ar-modes="webxr scene-viewer quick-look"
+                                touch-action="pan-y"
+                                style="width: 100%; height: 100%; background-color: transparent;">
+                            </model-viewer>
+                        `;
+                    } else if (content.type === 'video') {
+                        contentElement = document.createElement('div');
+                        contentElement.className = 'world-anchored-video world-anchored-content';
+                        contentElement.innerHTML = `
+                            <iframe 
+                                src="https://www.youtube.com/embed/${content.content}?autoplay=0&controls=1&rel=0" 
+                                title="${content.title}"
+                                frameborder="0" 
+                                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowfullscreen
+                                style="width: 100%; height: 100%;">
+                            </iframe>
+                        `;
+                    }
+                    
+                    if (contentElement) {
+                        // Apply 3D transform with perspective correction
+                        const perspectiveDistance = Math.max(200, 2000 - (distance * 50));
+                        const rotationY = relativeBearing < 60 ? relativeBearing * 0.3 : (360 - relativeBearing) * -0.3;
+                        const rotationX = (deviceTilt - 90) * 0.2;
+                        
+                        worldObjectElement.style.transform = `translate(-50%, -50%) scale(${totalScale}) perspective(${perspectiveDistance}px) rotateY(${rotationY}deg) rotateX(${rotationX}deg)`;
+                        worldObjectElement.style.transformStyle = 'preserve-3d';
+                        
+                        // Add distance label
+                        const distanceLabel = document.createElement('div');
+                        distanceLabel.className = 'ar-object-distance';
+                        distanceLabel.textContent = `${Math.round(distance)}m`;
+                        
+                        // Add title label
+                        const titleLabel = document.createElement('div');
+                        titleLabel.className = 'ar-object-label';
+                        titleLabel.textContent = content.title;
+                        
+                        worldObjectElement.appendChild(contentElement);
+                        worldObjectElement.appendChild(titleLabel);
+                        worldObjectElement.appendChild(distanceLabel);
+                        
+                        // Add click event for interaction
+                        worldObjectElement.addEventListener('click', () => {
+                            showWorldObjectDetails(worldObject);
+                        });
+                        
+                        overlay.appendChild(worldObjectElement);
+                    }
+                }
+            });
+        }
+
+        // Show world object details
+        function showWorldObjectDetails(worldObject) {
+            const content = worldObject.content;
+            
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+                    <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold">${content.title}</h3>
+                        <button class="close-modal text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="p-4">
+                        <p class="text-gray-600 mb-4">Objek ini telah ditempatkan di dunia nyata. Anda dapat berjalan mengelilinginya untuk melihat dari berbagai sudut.</p>
+                        <div class="text-sm text-gray-500">
+                            Jarak: ${Math.round(calculateDistance(currentPosition.lat, currentPosition.lng, worldObject.lat, worldObject.lng))}m<br>
+                            Ditempatkan: ${new Date(worldObject.placedAt).toLocaleString('id-ID')}
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-200 flex gap-2">
+                        <button class="remove-object flex-1 bg-red-600 text-white py-2 rounded-lg">
+                            Hapus Objek
+                        </button>
+                        <button class="navigate-object flex-1 bg-blue-600 text-white py-2 rounded-lg">
+                            Navigasi ke Objek
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Add event listeners
+            modal.querySelector('.close-modal').addEventListener('click', () => {
+                document.body.removeChild(modal);
+            });
+            
+            modal.querySelector('.remove-object').addEventListener('click', () => {
+                if (confirm('Apakah Anda yakin ingin menghapus objek ini dari dunia nyata?')) {
+                    removeWorldObject(worldObject.id);
+                    document.body.removeChild(modal);
+                }
+            });
+            
+            modal.querySelector('.navigate-object').addEventListener('click', () => {
+                // Create a temporary target for navigation
+                targetARContent = {
+                    ...content,
+                    lat: worldObject.lat,
+                    lng: worldObject.lng,
+                    distance: calculateDistance(currentPosition.lat, currentPosition.lng, worldObject.lat, worldObject.lng)
+                };
+                updateDirectionArrow();
+                document.body.removeChild(modal);
+            });
+            
+            // Close when clicking outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            });
+        }
+
+        // Remove world object
+        function removeWorldObject(objectId) {
+            worldAnchoredObjects.delete(objectId);
+            placedObjectsData.delete(objectId);
+            savePlacedObjects();
+        }
+
         // Initialize the app when the page loads
         window.onload = initApp;
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c1646a922ab593',t:'MTc1NDY4MTA0OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c16fce70b3b59f',t:'MTc1NDY4MTUxNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
