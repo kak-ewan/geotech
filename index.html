@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GeoTech AR — Jelajah</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- A-Frame & AR.js -->
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+  <script src="https://rawcdn.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    html,body { height:100%; margin:0; }
+    .fade-in { animation: fadeIn .35s ease-in-out; }
+    @keyframes fadeIn { from {opacity:0; transform: translateY(6px)} to {opacity:1; transform: translateY(0)} }
+    /* AR scene sizing */
+    #arContainer a-scene { width:100%; height: calc(100vh - 64px); display:block; }
+    .nearby { box-shadow: 0 0 0 3px rgba(34,197,94,0.12); }
+    .play-badge { background: rgba(0,0,0,0.7); color: #fff; padding:6px 10px; border-radius:8px; font-weight:600; }
+    /* Arrow overlay */
+    #arrow {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%) rotate(0deg);
+      bottom: 22%;
+      z-index: 60;
+      pointer-events: none;
+      transition: transform 0.2s linear;
+      display: none;
+    }
+    #arrow svg { width: 88px; height: 88px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.25)); }
+    /* left pane responsive */
+    @media (max-width: 768px) {
+      #leftPane { position: absolute; z-index: 40; width: 86%; max-width: 360px; background: rgba(255,255,255,0.98); height: calc(100vh - 64px); overflow:auto; transform: translateX(-10px); box-shadow: 0 10px 30px rgba(0,0,0,0.12); }
+      #arContainer { margin-left: 0 !important; }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white shadow-sm p-3 sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="text-2xl">📍</div>
+        <div class="text-lg font-bold">GeoTech AR — Jelajah</div>
+      </div>
+      <div class="flex gap-2 items-center">
+        <button id="btnJelajah" class="bg-green-600 text-white px-3 py-1 rounded">Jelajah</button>
+        <button id="btnBantuan" class="bg-gray-200 px-3 py-1 rounded hidden md:inline">Bantuan</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main area -->
+  <main class="flex flex-1 overflow-hidden relative">
+    <!-- Left: list -->
+    <aside id="leftPane" class="w-80 border-r bg-white p-4 overflow-auto">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <h2 class="font-semibold text-lg">Lokasi AR</h2>
+          <div id="status" class="text-sm text-gray-500">Tekan Jelajah untuk memulai.</div>
+        </div>
+        <div class="text-sm text-gray-400">CSV: name,lat,lon,url</div>
+      </div>
+
+      <ul id="locationList" class="space-y-3"></ul>
+
+      <div class="mt-4 text-xs text-gray-500">
+        Petunjuk: Pilih lokasi untuk jadi target navigasi. Penunjuk arah muncul di layar dan menunjukkan arah menuju target.
+      </div>
+    </aside>
+
+    <!-- Right: AR container -->
+    <section id="arContainer" class="flex-1 relative bg-black/5">
+      <!-- a-scene will be injected here when Jelajah starts -->
+      <!-- arrow overlay -->
+      <div id="arrow" aria-hidden="true">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" stop-color="#06b6d4"/>
+              <stop offset="1" stop-color="#3b82f6"/>
+            </linearGradient>
+          </defs>
+          <g transform="translate(50,50)">
+            <polygon points="-18,-10 0,-40 18,-10 6,-10 6,40 -6,40 -6,-10" fill="url(#g)"/>
+            <circle cx="0" cy="0" r="16" fill="white" opacity="0.06"/>
+          </g>
+        </svg>
+      </div>
+    </section>
+  </main>
+
+<script>
+/*
+ GeoTech AR — Jelajah single HTML
+ CSV: name,lat,lon,url
+ Features:
+ - fetch CSV
+ - display AR (models/images/video) via AR.js
+ - GPS activation & watch position
+ - Device orientation to show arrow pointing to selected target
+ - 'Bantuan' toggles list
+*/
+
+document.addEventListener('DOMContentLoaded', () => {
+  // ====== CONFIG ======
+  const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCPrAyjTP4O7lSWJnouA4Ysnd5U88mcM-dWyJG0Nv9eWOA3yVKrGJ1-5G_QDdEcTNpwn0F5XbzeUJh/pub?gid=0&single=true&output=csv';
+  const PROXIMITY_METERS = 20; // distance threshold for video play
+  const AR_SCENE_AFRAME_ATTRS = `embedded vr-mode-ui="enabled: false" arjs="sourceType: webcam; gpsMinAccuracy: 100;"`;
+
+  // ====== DOM refs ======
+  const btnJelajah = document.getElementById('btnJelajah');
+  const btnBantuan = document.getElementById('btnBantuan');
+  const leftPane = document.getElementById('leftPane');
+  const locationList = document.getElementById('locationList');
+  const status = document.getElementById('status');
+  const arContainer = document.getElementById('arContainer');
+  const arrowEl = document.getElementById('arrow');
+
+  // ====== STATE ======
+  let pins = []; // {name,lat,lon,url,type}
+  let userPos = null;
+  let watchId = null;
+  let arSceneCreated = false;
+  let selectedIndex = null;
+  let heading = null; // device heading in degrees (0..360)
+  let orientationPermissionGranted = false;
+
+  // ====== UTIL ======
+  function setStatus(s) { status.textContent = s; }
+  function escapeHtml(s){ return s ? String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c])) : ''; }
+
+  function parseCSV(text) {
+    text = text.replace(/^\uFEFF/, '');
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length>0);
+    if (lines.length === 0) return [];
+    let start=0;
+    const header = lines[0].toLowerCase();
+    if (header.includes('name') && header.includes('lat')) start=1;
+    const rows = [];
+    for (let i=start;i<lines.length;i++){
+      const parts = lines[i].split(',');
+      if (parts.length < 4) continue;
+      const name = parts[0].trim();
+      const lat = parseFloat(parts[1]);
+      const lon = parseFloat(parts[2]);
+      const url = parts.slice(3).join(',').trim();
+      if (!name || isNaN(lat) || isNaN(lon) || !url) continue;
+      rows.push({ name, lat, lon, url });
+    }
+    return rows;
+  }
+
+  function detectType(url){
+    const u = url.split('?')[0].toLowerCase();
+    if (u.match(/\.(glb|gltf)$/)) return 'model';
+    if (u.match(/\.(mp4|webm|ogg)$/)) return 'video';
+    if (u.match(/\.(png|jpg|jpeg|webp|gif)$/)) return 'image';
+    return 'unknown';
+  }
+
+  // haversine
+  function distanceMeters(aLat,aLon,bLat,bLon){
+    const toRad = v => v*Math.PI/180;
+    const R = 6371000;
+    const dLat = toRad(bLat-aLat);
+    const dLon = toRad(bLon-aLon);
+    const lat1 = toRad(aLat), lat2 = toRad(bLat);
+    const sinDlat = Math.sin(dLat/2), sinDlon = Math.sin(dLon/2);
+    const a = sinDlat*sinDlat + Math.cos(lat1)*Math.cos(lat2)*sinDlon*sinDlon;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R*c;
+  }
+
+  // bearing from user to target (degrees)
+  function bearingTo(aLat,aLon,bLat,bLon){
+    const toRad = v => v*Math.PI/180;
+    const toDeg = v => v*180/Math.PI;
+    const y = Math.sin(toRad(bLon-aLon)) * Math.cos(toRad(bLat));
+    const x = Math.cos(toRad(aLat))*Math.sin(toRad(bLat)) - Math.sin(toRad(aLat))*Math.cos(toRad(bLat))*Math.cos(toRad(bLon-aLon));
+    let brng = toDeg(Math.atan2(y,x));
+    brng = (brng + 360) % 360;
+    return brng;
+  }
+
+  // ====== UI render list =====
+  function renderList(){
+    locationList.innerHTML = '';
+    pins.forEach((p, idx) => {
+      const li = document.createElement('li');
+      li.className = 'bg-white p-3 rounded shadow flex items-center justify-between';
+      li.setAttribute('data-idx', idx);
+      li.innerHTML = `
+        <div>
+          <div class="font-semibold text-sm">${escapeHtml(p.name)}</div>
+          <div class="text-xs text-gray-500 distance">—</div>
+          <div class="text-xs text-gray-500 break-words">${escapeHtml(p.url)}</div>
+        </div>
+        <div class="flex flex-col items-end gap-2">
+          <button class="bg-blue-600 text-white px-2 py-1 rounded text-sm btn-select">Pilih</button>
+          ${p.type === 'video' ? '<button class="play-badge play-btn" style="display:none">Play</button>' : ''}
+        </div>
+      `;
+      locationList.appendChild(li);
+    });
+
+    // events
+    locationList.querySelectorAll('.btn-select').forEach(btn=>{
+      btn.onclick = (e)=>{
+        const idx = Number(e.target.closest('li').getAttribute('data-idx'));
+        selectTarget(idx);
+      };
+    });
+    locationList.querySelectorAll('.play-btn').forEach((b,i)=>{
+      b.onclick = (e)=>{
+        const idx = Number(e.target.closest('li').getAttribute('data-idx'));
+        playVideoAt(idx);
+      };
+    });
+  }
+
+  // ====== AR create & entities =====
+  function createSceneIfNeeded(){
+    if (arSceneCreated) return;
+    arContainer.innerHTML = `
+      <a-scene ${AR_SCENE_AFRAME_ATTRS}>
+        <a-camera gps-camera rotation-reader></a-camera>
+      </a-scene>`;
+    arSceneCreated = true;
+  }
+
+  function clearAREntities(){
+    const scene = arContainer.querySelector('a-scene');
+    if (!scene) return;
+    Array.from(scene.querySelectorAll('[gps-entity-place]')).forEach(e=>e.remove());
+  }
+
+  function createAREntities(){
+    const scene = arContainer.querySelector('a-scene');
+    if (!scene) return;
+    clearAREntities();
+    pins.forEach((p, idx) => {
+      if (p.type === 'model'){
+        const ent = document.createElement('a-entity');
+        ent.setAttribute('gps-entity-place', `latitude: ${p.lat}; longitude: ${p.lon};`);
+        ent.setAttribute('gltf-model', p.url);
+        ent.setAttribute('scale', p.scale || '1 1 1');
+        ent.setAttribute('rotation', p.rotation || '0 180 0');
+        ent.setAttribute('animation-mixer', '');
+        scene.appendChild(ent);
+      } else if (p.type === 'image') {
+        const img = document.createElement('a-image');
+        img.setAttribute('gps-entity-place', `latitude: ${p.lat}; longitude: ${p.lon};`);
+        img.setAttribute('src', p.url);
+        img.setAttribute('width', p.width || '2');
+        img.setAttribute('height', p.height || '1.2');
+        scene.appendChild(img);
+      } else if (p.type === 'video') {
+        // create hidden video element if not exists
+        let vid = document.getElementById('video-pin-' + idx);
+        if (!vid) {
+          vid = document.createElement('video');
+          vid.id = 'video-pin-' + idx;
+          vid.src = p.url;
+          vid.setAttribute('playsinline','');
+          vid.setAttribute('webkit-playsinline','');
+          vid.muted = true;
+          vid.loop = true;
+          vid.crossOrigin = 'anonymous';
+          vid.style.display = 'none';
+          document.body.appendChild(vid);
+        }
+        const plane = document.createElement('a-plane');
+        plane.setAttribute('gps-entity-place', `latitude: ${p.lat}; longitude: ${p.lon};`);
+        plane.setAttribute('material', `shader: flat; src: #${vid.id}`);
+        plane.setAttribute('width', p.width || '2');
+        plane.setAttribute('height', p.height || '1.2');
+        scene.appendChild(plane);
+      }
+    });
+  }
+
+  // ====== Video play handler =====
+  function playVideoAt(idx){
+    const vid = document.getElementById('video-pin-' + idx);
+    if (!vid) return alert('Video belum siap.');
+    // user interaction
+    vid.muted = false;
+    vid.play().catch(e => {
+      console.warn('play rejected', e);
+      alert('Browser memblokir autoplay. Sentuh layar untuk memulai.');
+    });
+  }
+
+  // ====== GEO watch & distances =====
+  function startWatchPosition(){
+    if (!('geolocation' in navigator)) {
+      setStatus('Geolocation tidak tersedia di browser.');
+      return;
+    }
+    // request single current position first (to prompt permission)
+    navigator.geolocation.getCurrentPosition(pos=> {
+      userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      updateUIDistances();
+    }, err => {
+      console.error('initial geo err', err);
+      setStatus('Izin lokasi diperlukan.');
+    }, { enableHighAccuracy: true, timeout: 10000 });
+
+    // then watch
+    watchId = navigator.geolocation.watchPosition(pos => {
+      userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      updateUIDistances();
+    }, err => {
+      console.error('watch geo err', err);
+      setStatus('Gagal mendapatkan lokasi: ' + (err.message || err.code));
+    }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
+  }
+
+  function updateUIDistances(){
+    if (!userPos) return;
+    locationList.querySelectorAll('li').forEach(li=>{
+      const idx = Number(li.getAttribute('data-idx'));
+      const p = pins[idx];
+      const d = distanceMeters(userPos.lat, userPos.lon, p.lat, p.lon);
+      const distEl = li.querySelector('.distance');
+      distEl.textContent = (d >= 1000) ? (d/1000).toFixed(2)+' km' : Math.round(d)+' m';
+      if (d <= PROXIMITY_METERS) li.classList.add('nearby'); else li.classList.remove('nearby');
+      // show play if video
+      const playBtn = li.querySelector('.play-btn');
+      if (playBtn) playBtn.style.display = (d <= PROXIMITY_METERS) ? 'inline-block' : 'none';
+    });
+
+    // If a target selected, update arrow (bearing uses userPos and target)
+    if (selectedIndex !== null && typeof heading === 'number') {
+      updateArrowForSelected();
+    }
+  }
+
+  // ====== Device orientation (heading) =====
+  function setupDeviceOrientation(){
+    // iOS requires requestPermission
+    function enableOrientationListening(){
+      window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+      window.addEventListener('deviceorientation', handleOrientation, true);
+      orientationPermissionGranted = true;
+    }
+
+    // If DeviceOrientationEvent.requestPermission exists (iOS), ask user
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(response => {
+          if (response === 'granted') enableOrientationListening();
+          else {
+            console.warn('DeviceOrientation permission denied');
+            setStatus('Izin orientasi tidak diberikan — penunjuk arah mungkin tidak berfungsi.');
+          }
+        })
+        .catch(err => {
+          console.error('orientation permission error', err);
+          setStatus('Tidak bisa mengaktifkan orientasi perangkat.');
+        });
+    } else {
+      // non-iOS: just listen
+      enableOrientationListening();
+    }
+  }
+
+  function handleOrientation(ev){
+    // try to use absolute alpha if available
+    const a = ev.alpha;
+    const absolute = ev.absolute;
+    if (a === null || a === undefined) {
+      // not available
+      return;
+    }
+    // different devices provide alpha relative to magnetic north or device coords.
+    // We'll treat alpha as heading in degrees (best-effort).
+    // Use window.orientation or screen.orientation if needed to rotate.
+    let alpha = a;
+    // Adjust for screen orientation
+    const screenOrientation = (screen.orientation && screen.orientation.angle) || (window.orientation || 0);
+    alpha = alpha - screenOrientation;
+    // Normalize
+    heading = (alpha + 360) % 360;
+    if (selectedIndex !== null) updateArrowForSelected();
+  }
+
+  // Update arrow overlay to point to selected target
+  function updateArrowForSelected(){
+    if (selectedIndex === null || !userPos || typeof heading !== 'number') {
+      arrowEl.style.display = 'none';
+      return;
+    }
+    const target = pins[selectedIndex];
+    if (!target) { arrowEl.style.display = 'none'; return; }
+    const brng = bearingTo(userPos.lat, userPos.lon, target.lat, target.lon);
+    // arrow rotation (deg) = brng - heading
+    const rot = (brng - heading + 360) % 360;
+    arrowEl.style.display = 'block';
+    arrowEl.style.transform = `translateX(-50%) rotate(${rot}deg)`;
+  }
+
+  // ====== selection logic =====
+  function selectTarget(idx){
+    selectedIndex = idx;
+    // highlight chosen list item
+    locationList.querySelectorAll('li').forEach(li=>{
+      if (Number(li.getAttribute('data-idx')) === idx) li.classList.add('ring-2','ring-indigo-200');
+      else li.classList.remove('ring-2','ring-indigo-200');
+    });
+    // ensure arrow visible (if heading available)
+    if (!orientationPermissionGranted) {
+      setupDeviceOrientation(); // try to enable
+    }
+    updateArrowForSelected();
+    // optional: center camera? AR.js doesn't provide direct teleport; we provide arrow + distance
+  }
+
+  // ====== play video helper =====
+  function playVideoAtIndexIfNearby(idx){
+    const li = locationList.querySelector(`li[data-idx="${idx}"]`);
+    if (!li) return;
+    const dText = li.querySelector('.distance').textContent;
+    // we already show play button only if within PROXIMITY
+    const vid = document.getElementById('video-pin-' + idx);
+    if (!vid) return;
+    vid.muted = false;
+    vid.play().catch(e => {
+      console.warn('play rejected', e);
+      alert('Browser mungkin memblokir autoplay — sentuh layar untuk memulai.');
+    });
+  }
+
+  // ====== start Jelajah flow =====
+  btnJelajah.addEventListener('click', () => {
+    setStatus('Memuat CSV & menyiapkan AR. Izin kamera & lokasi akan diminta.');
+    // request orientation permission early on iOS
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      // we'll request later in setupDeviceOrientation; call here to prompt earlier (user gesture)
+      DeviceOrientationEvent.requestPermission().then(()=>{}).catch(()=>{});
+    }
+    // fetch CSV
+    fetch(CSV_URL).then(r=>r.text()).then(txt=>{
+      const rows = parseCSV(txt);
+      pins = rows.map(r => ({ name: r.name, lat: r.lat, lon: r.lon, url: r.url, type: detectType(r.url) }));
+      if (!pins.length) { setStatus('CSV kosong atau format tidak sesuai (name,lat,lon,url)'); return; }
+      renderList();
+      // create AR scene and entities
+      createSceneIfNeeded();
+      createAREntities();
+      setStatus('Mode Jelajah aktif — jika diminta, izinkan kamera & lokasi.');
+      // start watching position
+      startWatchPositionAndOrientation();
+    }).catch(err=>{
+      console.error('CSV load error', err);
+      setStatus('Gagal memuat CSV: ' + err);
+    });
+  });
+
+  // Toggle bantuan (left list)
+  btnBantuan.addEventListener('click', () => {
+    if (leftPane.classList.contains('hidden')) leftPane.classList.remove('hidden');
+    else leftPane.classList.add('hidden');
+  });
+
+  // On small screens show / hide with same button
+  // also show button on mobile when list hidden
+  // You may call btnBantuan.click() to toggle
+
+  // ====== watch position + orientation initializer =====
+  function startWatchPositionAndOrientation(){
+    // get single pos to prompt permission
+    if (!('geolocation' in navigator)) {
+      setStatus('Geolocation tidak tersedia pada browser ini.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(pos=>{
+      userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      setStatus('Lokasi aktif. Menunggu orientasi perangkat...');
+      updateUIDistancesAndPlayButtons();
+    }, err=>{
+      console.error('initial geo error', err);
+      setStatus('Izin lokasi diperlukan untuk navigasi.');
+    }, { enableHighAccuracy: true, timeout: 10000 });
+
+    watchId = navigator.geolocation.watchPosition(pos=>{
+      userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      updateUIDistancesAndPlayButtons();
+      if (selectedIndex !== null && typeof heading === 'number') updateArrowForSelected();
+    }, err=>{
+      console.error('watch error', err);
+      setStatus('Gagal memantau lokasi: ' + (err.message || err.code));
+    }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
+
+    // start listening orientation
+    setupDeviceOrientation();
+  }
+
+  function updateUIDistancesAndPlayButtons(){
+    if (!userPos) return;
+    locationList.querySelectorAll('li').forEach(li=>{
+      const idx = Number(li.getAttribute('data-idx'));
+      const p = pins[idx];
+      const d = distanceMeters(userPos.lat, userPos.lon, p.lat, p.lon);
+      const distEl = li.querySelector('.distance');
+      distEl.textContent = (d >= 1000) ? (d/1000).toFixed(2)+' km' : Math.round(d)+' m';
+      if (d <= PROXIMITY_METERS) li.classList.add('nearby'); else li.classList.remove('nearby');
+      const playBtn = li.querySelector('.play-btn');
+      if (playBtn) playBtn.style.display = (d <= PROXIMITY_METERS) ? 'inline-block' : 'none';
+    });
+  }
+
+  // ====== cleanup on unload =====
+  window.addEventListener('beforeunload', () => {
+    if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
+  });
+
+  // initial: hide left pane on small screens
+  if (window.innerWidth < 800) {
+    leftPane.classList.add('hidden');
+    btnBantuan.classList.remove('hidden');
+  }
+});
+</script>
+</body>
+</html>
