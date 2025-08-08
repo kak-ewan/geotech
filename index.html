@@ -2,129 +2,91 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <title>GeoAR.js dengan Petunjuk Arah</title>
-    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <title>AR Lokasi - Dinamis dari CSV</title>
+    
+    <!-- A-Frame & AR.js -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+    
+    <!-- CSV Parser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    
     <style>
-      .debug-panel {
-        position: fixed;
-        bottom: 10px;
+      body, html { margin: 0; padding: 0; overflow: hidden; font-family: sans-serif; }
+      #loading {
+        position: absolute;
+        top: 10px;
         left: 10px;
-        background: rgba(0,0,0,0.7);
-        color: white;
-        padding: 10px;
-        border-radius: 5px;
-        font-family: Arial;
-        z-index: 10000;
-      }
-      .direction-arrow {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 40px;
-        color: red;
-        z-index: 10000;
+        background: rgba(255,255,255,0.9);
+        padding: 10px 15px;
+        border-radius: 8px;
+        z-index: 999;
       }
     </style>
   </head>
-
-  <body style="margin: 0; overflow: hidden;">
-    <div class="direction-arrow" id="directionArrow">↑</div>
-    <div class="debug-panel" id="debugPanel">
-      <div>Mencari lokasi...</div>
-      <div id="distanceInfo">Jarak: -</div>
-      <div id="directionInfo">Arah: -</div>
-    </div>
+  <body>
+    <div id="loading">📡 Memuat lokasi dari spreadsheet...</div>
 
     <a-scene
-      vr-mode-ui="enabled: false"
       embedded
-      arjs="sourceType: webcam; debugUIEnabled: true;"
+      arjs="sourceType: webcam; gpsMinAccuracy: 100; debugUIEnabled: false;"
+      renderer="logarithmicDepthBuffer: true;"
+      vr-mode-ui="enabled: false"
     >
-      <!-- Objek target -->
-      <a-box
-        id="targetObject"
-        look-at="[gps-camera]"
-        scale="10 10 10"
-        material="color: red; opacity: 0.9;"
-        gps-entity-place="latitude: -8.6247; longitude: 116.1190;"
-      ></a-box>
-      
-      <!-- Petunjuk arah (akan dibuat secara dinamis) -->
-      <a-entity id="directionIndicator"></a-entity>
-      
       <a-camera gps-camera rotation-reader></a-camera>
     </a-scene>
 
     <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const targetLat = -8.6247;
-        const targetLng = 116.1190;
-        let userLat, userLng;
-        let arrowElement = document.getElementById('directionArrow');
-        let distanceInfo = document.getElementById('distanceInfo');
-        let directionInfo = document.getElementById('directionInfo');
-        let debugPanel = document.getElementById('debugPanel');
-        
-        // Update posisi pengguna
-        window.addEventListener('gps-camera-update-position', function(e) {
-          userLat = e.detail.position.latitude;
-          userLng = e.detail.position.longitude;
-          
-          // Hitung jarak dan arah
-          const distance = calculateDistance(userLat, userLng, targetLat, targetLng);
-          const bearing = calculateBearing(userLat, userLng, targetLat, targetLng);
-          
-          // Update UI
-          distanceInfo.textContent = `Jarak: ${distance.toFixed(1)} meter`;
-          directionInfo.textContent = `Arah: ${bearing.toFixed(1)}° dari Utara`;
-          
-          // Putar panah petunjuk arah
-          arrowElement.style.transform = `translate(-50%, -50%) rotate(${bearing}deg)`;
-          
-          // Tampilkan debug info
-          debugPanel.innerHTML = `
-            <div>Posisi Anda: ${userLat.toFixed(6)}, ${userLng.toFixed(6)}</div>
-            <div>Target: ${targetLat.toFixed(6)}, ${targetLng.toFixed(6)}</div>
-            <div id="distanceInfo">Jarak: ${distance.toFixed(1)} meter</div>
-            <div id="directionInfo">Arah: ${bearing.toFixed(1)}° dari Utara</div>
-          `;
+      const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCPrAyjTP4O7lSWJnouA4Ysnd5U88mcM-dWyJG0Nv9eWOA3yVKrGJ1-5G_QDdEcTNpwn0F5XbzeUJh/pub?output=csv";
+      
+      // Default model if not provided
+      const DEFAULT_MODEL = "https://cdn.glitch.global/94b64d3b-9cd0-4d73-bf40-c27c889c2748/marker.glb?v=1691549132930";
+
+      fetch(CSV_URL)
+        .then(response => response.text())
+        .then(csvText => {
+          Papa.parse(csvText, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+              const places = results.data;
+              const scene = document.querySelector("a-scene");
+
+              places.forEach(place => {
+                const lat = parseFloat(place.latitude);
+                const lon = parseFloat(place.longitude);
+                const name = place.name || "Tanpa Nama";
+                const desc = place.description || "";
+                const modelUrl = place.model || DEFAULT_MODEL;
+
+                // Buat model 3D
+                const model = document.createElement("a-entity");
+                model.setAttribute("gps-entity-place", `latitude: ${lat}; longitude: ${lon}`);
+                model.setAttribute("gltf-model", modelUrl);
+                model.setAttribute("scale", "5 5 5");
+                model.setAttribute("look-at", "[gps-camera]");
+
+                // Buat teks nama/deskripsi di atas model
+                const text = document.createElement("a-text");
+                text.setAttribute("value", `${name}\n${desc}`);
+                text.setAttribute("align", "center");
+                text.setAttribute("color", "#FFD700");
+                text.setAttribute("position", "0 3 0");
+                text.setAttribute("scale", "5 5 5");
+                text.setAttribute("look-at", "[gps-camera]");
+
+                model.appendChild(text);
+                scene.appendChild(model);
+              });
+
+              document.getElementById("loading").style.display = "none";
+            }
+          });
+        })
+        .catch(error => {
+          document.getElementById("loading").innerText = "❌ Gagal memuat data CSV.";
+          console.error("CSV load error:", error);
         });
-        
-        // Fungsi menghitung jarak (dalam meter)
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-          const R = 6371e3; // Earth radius in meters
-          const φ1 = lat1 * Math.PI/180;
-          const φ2 = lat2 * Math.PI/180;
-          const Δφ = (lat2-lat1) * Math.PI/180;
-          const Δλ = (lon2-lon1) * Math.PI/180;
-          
-          const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                   Math.cos(φ1) * Math.cos(φ2) *
-                   Math.sin(Δλ/2) * Math.sin(Δλ/2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-          
-          return R * c;
-        }
-        
-        // Fungsi menghitung arah (bearing)
-        function calculateBearing(lat1, lon1, lat2, lon2) {
-          const φ1 = lat1 * Math.PI/180;
-          const φ2 = lat2 * Math.PI/180;
-          const λ1 = lon1 * Math.PI/180;
-          const λ2 = lon2 * Math.PI/180;
-          
-          const y = Math.sin(λ2-λ1) * Math.cos(φ2);
-          const x = Math.cos(φ1)*Math.sin(φ2) -
-                    Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
-          const θ = Math.atan2(y, x);
-          
-          return (θ*180/Math.PI + 360) % 360;
-        }
-      });
     </script>
   </body>
 </html>
