@@ -1,159 +1,447 @@
+
+
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>AR Lokasi - Lengkap</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Geolokasi Explorer</title>
+    <script src="https://aframe.io/releases/0.9.2/aframe.min.js"></script>
+    <script src="https://raw.githack.com/jeromeetienne/AR.js/master/aframe/build/aframe-ar.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      body, html {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        font-family: sans-serif;
-      }
-
-      #ui {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background: rgba(255,255,255,0.95);
-        padding: 10px;
-        border-radius: 8px;
-        z-index: 999;
-        max-width: 300px;
-      }
-
-      #placesList {
-        max-height: 200px;
-        overflow-y: auto;
-        margin-top: 5px;
-      }
-
-      #placesList div {
-        padding: 4px 0;
-        border-bottom: 1px solid #ddd;
-      }
+        body { margin: 0; font-family: 'Inter', sans-serif; }
+        .ar-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        .ui-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+        .ui-overlay > * { pointer-events: auto; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .ar-object { 
+            position: absolute; 
+            background: rgba(255, 255, 255, 0.9); 
+            padding: 10px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translate(-50%, -50%);
+            max-width: 200px;
+            text-align: center;
+        }
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
-  </head>
-  <body>
-
-    <div id="ui">
-      <div><strong>🔍 Cari Lokasi</strong></div>
-      <input type="text" id="searchBox" placeholder="Ketik nama lokasi..." style="width: 100%; margin-top: 5px;" />
-      <div id="placesList"></div>
-      <div id="nearest" style="margin-top: 10px; color: #444;"></div>
+</head>
+<body class="bg-gray-100">
+    <!-- Halaman Awal -->
+    <div id="homePage" class="min-h-screen gradient-bg flex items-center justify-center">
+        <div class="text-center text-white px-6">
+            <div class="mb-8">
+                <h1 class="text-5xl font-bold mb-4">🌍 AR Explorer</h1>
+                <p class="text-xl opacity-90">Jelajahi dunia dengan Augmented Reality</p>
+            </div>
+            <button id="exploreBtn" class="bg-white text-purple-600 px-8 py-4 rounded-full text-lg font-semibold hover:bg-gray-100 transform hover:scale-105 transition-all duration-200 shadow-lg">
+                🚀 Mulai Jelajah
+            </button>
+        </div>
     </div>
 
-    <a-scene
-      embedded
-      arjs="sourceType: webcam; gpsMinAccuracy: 100; debugUIEnabled: false;"
-      renderer="logarithmicDepthBuffer: true;"
-      vr-mode-ui="enabled: false"
-    >
-      <a-camera gps-camera rotation-reader></a-camera>
-    </a-scene>
+    <!-- Halaman AR -->
+    <div id="arPage" class="hidden">
+        <!-- AR Scene -->
+        <a-scene 
+            id="arScene"
+            class="ar-scene"
+            embedded 
+            arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+            vr-mode-ui="enabled: false"
+            renderer="logarithmicDepthBuffer: true;"
+            loading-screen="enabled: false">
+            
+            <a-camera 
+                id="arCamera"
+                gps-camera 
+                rotation-reader
+                look-controls-enabled="false"
+                arjs-look-controls="smoothingFactor: 0.1">
+            </a-camera>
+        </a-scene>
+
+        <!-- UI Overlay -->
+        <div class="ui-overlay">
+            <!-- Header Controls -->
+            <div class="flex justify-between items-center p-4">
+                <button id="backBtn" class="bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70 transition-all">
+                    ← Kembali
+                </button>
+                <button id="helpBtn" class="bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70 transition-all">
+                    ❓ Bantuan
+                </button>
+            </div>
+
+            <!-- Status Info -->
+            <div id="statusInfo" class="absolute top-20 left-4 bg-black bg-opacity-50 text-white p-3 rounded-lg">
+                <div class="flex items-center space-x-2">
+                    <div class="loading-spinner"></div>
+                    <span>Memuat lokasi...</span>
+                </div>
+            </div>
+
+            <!-- Distance Info -->
+            <div id="distanceInfo" class="absolute bottom-20 left-4 right-4 bg-black bg-opacity-50 text-white p-3 rounded-lg hidden">
+                <div class="text-center">
+                    <div class="text-sm opacity-75">Objek terdekat:</div>
+                    <div id="nearestObject" class="font-semibold"></div>
+                    <div id="nearestDistance" class="text-sm"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Bantuan -->
+    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full max-h-96 overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">📍 Objek Tersedia</h3>
+                    <button id="closeHelpBtn" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                </div>
+                <div id="objectList" class="space-y-3">
+                    <!-- Akan diisi dengan JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Izin -->
+    <div id="permissionModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full p-6 text-center">
+            <h3 class="text-xl font-bold mb-4">🔐 Izin Diperlukan</h3>
+            <p class="text-gray-600 mb-6">Aplikasi memerlukan akses kamera dan lokasi untuk fitur AR</p>
+            <div class="space-y-3">
+                <button id="grantPermissionBtn" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors">
+                    Berikan Izin
+                </button>
+                <button id="cancelPermissionBtn" class="w-full bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition-colors">
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
-      const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCPrAyjTP4O7lSWJnouA4Ysnd5U88mcM-dWyJG0Nv9eWOA3yVKrGJ1-5G_QDdEcTNpwn0F5XbzeUJh/pub?output=csv";
-      const DEFAULT_MODEL = "https://cdn.glitch.global/94b64d3b-9cd0-4d73-bf40-c27c889c2748/marker.glb?v=1691549132930";
-      let places = [];
+        // Global variables
+        let arObjects = [];
+        let userLocation = null;
+        let watchId = null;
+        let arScene = null;
+        let arCamera = null;
 
-      const scene = document.querySelector("a-scene");
-      const searchBox = document.getElementById("searchBox");
-      const placesList = document.getElementById("placesList");
-      const nearestBox = document.getElementById("nearest");
+        // Foursquare API credentials
+        const FOURSQUARE_CLIENT_ID = 'WUD2DPDA5VDU2BXJC5NS4G1JUAPWTHZ4ZOB42JQUTPU1NIUT';
+        const FOURSQUARE_CLIENT_SECRET = 'WZ4YKMWYVFTF0BV1I0YFTXFDUU5OMC00Q24EDRYUHQQI50ZG';
 
-      function toRadians(deg) {
-        return deg * Math.PI / 180;
-      }
-
-      function computeDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371000; // Earth radius in meters
-        const φ1 = toRadians(lat1);
-        const φ2 = toRadians(lat2);
-        const Δφ = toRadians(lat2 - lat1);
-        const Δλ = toRadians(lon2 - lon1);
-        const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
-        return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-      }
-
-      function renderPlaces(data) {
-        data.forEach(place => {
-          const lat = parseFloat(place.latitude);
-          const lon = parseFloat(place.longitude);
-          const name = place.name || "Tanpa Nama";
-          const desc = place.description || "";
-          const modelUrl = place.model || DEFAULT_MODEL;
-
-          const model = document.createElement("a-entity");
-          model.setAttribute("gps-entity-place", `latitude: ${lat}; longitude: ${lon}`);
-          model.setAttribute("gltf-model", modelUrl);
-          model.setAttribute("scale", "5 5 5");
-          model.setAttribute("look-at", "[gps-camera]");
-
-          const label = document.createElement("a-text");
-          label.setAttribute("value", `${name}\n${desc}`);
-          label.setAttribute("align", "center");
-          label.setAttribute("color", "#FFD700");
-          label.setAttribute("position", "0 3 0");
-          label.setAttribute("scale", "5 5 5");
-          label.setAttribute("look-at", "[gps-camera]");
-
-          model.appendChild(label);
-          scene.appendChild(model);
-        });
-      }
-
-      function updateList(filter = "") {
-        const lower = filter.toLowerCase();
-        placesList.innerHTML = "";
-        places
-          .filter(p => p.name.toLowerCase().includes(lower))
-          .forEach(p => {
-            const div = document.createElement("div");
-            div.innerText = p.name;
-            placesList.appendChild(div);
-          });
-      }
-
-      function showNearest(userLat, userLon) {
-        let nearest = null;
-        let minDist = Infinity;
-
-        places.forEach(p => {
-          const d = computeDistance(userLat, userLon, parseFloat(p.latitude), parseFloat(p.longitude));
-          if (d < minDist) {
-            minDist = d;
-            nearest = p;
-          }
-        });
-
-        if (nearest) {
-          nearestBox.innerText = `📍 Terdekat: ${nearest.name} (${Math.round(minDist)}m)`;
+        // Set AR.js base URL
+        if (typeof THREEx !== 'undefined' && THREEx.ArToolkitContext) {
+            THREEx.ArToolkitContext.baseURL = 'https://raw.githack.com/jeromeetienne/ar.js/master/three.js/';
         }
-      }
 
-      // Update saat lokasi berubah
-      window.addEventListener("gps-camera-update-position", e => {
-        const pos = e.detail.position;
-        showNearest(pos.latitude, pos.longitude);
-      });
+        // DOM elements
+        const homePage = document.getElementById('homePage');
+        const arPage = document.getElementById('arPage');
+        const exploreBtn = document.getElementById('exploreBtn');
+        const backBtn = document.getElementById('backBtn');
+        const helpBtn = document.getElementById('helpBtn');
+        const helpModal = document.getElementById('helpModal');
+        const closeHelpBtn = document.getElementById('closeHelpBtn');
+        const permissionModal = document.getElementById('permissionModal');
+        const grantPermissionBtn = document.getElementById('grantPermissionBtn');
+        const cancelPermissionBtn = document.getElementById('cancelPermissionBtn');
+        const statusInfo = document.getElementById('statusInfo');
+        const distanceInfo = document.getElementById('distanceInfo');
+        const objectList = document.getElementById('objectList');
 
-      fetch(CSV_URL)
-        .then(res => res.text())
-        .then(csv => {
-          const parsed = Papa.parse(csv, { header: true, skipEmptyLines: true });
-          places = parsed.data;
-          renderPlaces(places);
-          updateList();
+        // Load data from CSV
+        async function loadCSVData() {
+            try {
+                const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCPrAyjTP4O7lSWJnouA4Ysnd5U88mcM-dWyJG0Nv9eWOA3yVKrGJ1-5G_QDdEcTNpwn0F5XbzeUJh/pub?gid=0&single=true&output=csv';
+                const response = await fetch(csvUrl);
+                const csvText = await response.text();
+                
+                const lines = csvText.split('\n');
+                const objects = [];
+                
+                for (let i = 1; i < lines.length; i++) { // Skip header
+                    const line = lines[i].trim();
+                    if (line) {
+                        const [name, lat, lon, url] = line.split(',').map(item => item.trim());
+                        if (name && lat && lon) {
+                            objects.push({
+                                name: name.replace(/"/g, ''),
+                                lat: parseFloat(lat),
+                                lon: parseFloat(lon),
+                                url: url ? url.replace(/"/g, '') : ''
+                            });
+                        }
+                    }
+                }
+                
+                arObjects = objects;
+                console.log('Loaded objects:', arObjects);
+                updateObjectList();
+            } catch (error) {
+                console.error('Error loading CSV data:', error);
+                // Fallback data
+                arObjects = [
+                    { name: 'Monas', lat: -6.1754, lon: 106.8272, url: 'https://example.com/monas' },
+                    { name: 'Bundaran HI', lat: -6.1944, lon: 106.8229, url: 'https://example.com/hi' }
+                ];
+                updateObjectList();
+            }
+        }
+
+        // Update object list in help modal
+        function updateObjectList() {
+            objectList.innerHTML = '';
+            arObjects.forEach((obj, index) => {
+                const div = document.createElement('div');
+                div.className = 'p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors';
+                div.innerHTML = `
+                    <div class="font-semibold">${obj.name}</div>
+                    <div class="text-sm text-gray-600">Lat: ${obj.lat.toFixed(4)}, Lon: ${obj.lon.toFixed(4)}</div>
+                `;
+                div.onclick = () => navigateToObject(obj);
+                objectList.appendChild(div);
+            });
+        }
+
+        // Navigate to object
+        function navigateToObject(obj) {
+            helpModal.classList.add('hidden');
+            if (userLocation) {
+                const distance = calculateDistance(userLocation.lat, userLocation.lon, obj.lat, obj.lon);
+                alert(`Navigasi ke ${obj.name}\nJarak: ${distance.toFixed(2)} km\n\nDalam implementasi nyata, ini akan membuka aplikasi navigasi.`);
+            }
+        }
+
+        // Calculate distance between two points
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // Request permissions
+        async function requestPermissions() {
+            try {
+                // Request camera permission
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop());
+
+                // Request location permission
+                return new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            userLocation = {
+                                lat: position.coords.latitude,
+                                lon: position.coords.longitude
+                            };
+                            resolve(true);
+                        },
+                        (error) => {
+                            console.error('Location error:', error);
+                            reject(error);
+                        },
+                        { enableHighAccuracy: true, timeout: 10000 }
+                    );
+                });
+            } catch (error) {
+                console.error('Permission error:', error);
+                throw error;
+            }
+        }
+
+        // Start location tracking
+        function startLocationTracking() {
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        userLocation = {
+                            lat: position.coords.latitude,
+                            lon: position.coords.longitude
+                        };
+                        updateARObjects();
+                        updateNearestObject();
+                        statusInfo.innerHTML = `
+                            <div class="text-green-400">
+                                📍 Lokasi: ${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}
+                            </div>
+                        `;
+                    },
+                    (error) => {
+                        console.error('Location tracking error:', error);
+                        statusInfo.innerHTML = `
+                            <div class="text-red-400">
+                                ❌ Error lokasi: ${error.message}
+                            </div>
+                        `;
+                    },
+                    { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 }
+                );
+            }
+        }
+
+        // Update AR objects
+        function updateARObjects() {
+            if (!arScene || !userLocation) return;
+
+            // Remove existing AR objects
+            const existingObjects = arScene.querySelectorAll('[ar-object]');
+            existingObjects.forEach(obj => obj.remove());
+
+            // Add new AR objects
+            arObjects.forEach((obj, index) => {
+                const distance = calculateDistance(userLocation.lat, userLocation.lon, obj.lat, obj.lon);
+                
+                // Only show objects within 5km
+                if (distance <= 5) {
+                    const entity = document.createElement('a-text');
+                    entity.setAttribute('ar-object', '');
+                    entity.setAttribute('value', `${obj.name}\n${distance.toFixed(2)}km`);
+                    entity.setAttribute('color', '#ffffff');
+                    entity.setAttribute('background', 'color: rgba(0,0,0,0.7); opacity: 0.8');
+                    entity.setAttribute('align', 'center');
+                    entity.setAttribute('width', '6');
+                    entity.setAttribute('gps-entity-place', `latitude: ${obj.lat}; longitude: ${obj.lon}`);
+                    entity.setAttribute('look-at', '[gps-camera]');
+                    
+                    arScene.appendChild(entity);
+                }
+            });
+        }
+
+        // Update nearest object info
+        function updateNearestObject() {
+            if (!userLocation || arObjects.length === 0) return;
+
+            let nearest = null;
+            let minDistance = Infinity;
+
+            arObjects.forEach(obj => {
+                const distance = calculateDistance(userLocation.lat, userLocation.lon, obj.lat, obj.lon);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearest = obj;
+                }
+            });
+
+            if (nearest) {
+                document.getElementById('nearestObject').textContent = nearest.name;
+                document.getElementById('nearestDistance').textContent = `${minDistance.toFixed(2)} km`;
+                distanceInfo.classList.remove('hidden');
+            }
+        }
+
+        // Initialize AR
+        function initializeAR() {
+            arScene = document.getElementById('arScene');
+            arCamera = document.getElementById('arCamera');
+            
+            // Wait for A-Frame to be ready
+            arScene.addEventListener('loaded', () => {
+                console.log('AR Scene loaded');
+                startLocationTracking();
+            });
+        }
+
+        // Event listeners
+        exploreBtn.addEventListener('click', () => {
+            permissionModal.classList.remove('hidden');
         });
 
-      searchBox.addEventListener("input", e => {
-        updateList(e.target.value);
-      });
+        grantPermissionBtn.addEventListener('click', async () => {
+            try {
+                permissionModal.classList.add('hidden');
+                statusInfo.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <div class="loading-spinner"></div>
+                        <span>Meminta izin...</span>
+                    </div>
+                `;
+                
+                await requestPermissions();
+                
+                homePage.classList.add('hidden');
+                arPage.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    initializeAR();
+                }, 1000);
+                
+            } catch (error) {
+                alert('Izin diperlukan untuk menggunakan fitur AR. Silakan coba lagi.');
+                permissionModal.classList.remove('hidden');
+            }
+        });
+
+        cancelPermissionBtn.addEventListener('click', () => {
+            permissionModal.classList.add('hidden');
+        });
+
+        backBtn.addEventListener('click', () => {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+            arPage.classList.add('hidden');
+            homePage.classList.remove('hidden');
+        });
+
+        helpBtn.addEventListener('click', () => {
+            helpModal.classList.remove('hidden');
+        });
+
+        closeHelpBtn.addEventListener('click', () => {
+            helpModal.classList.add('hidden');
+        });
+
+        // Close modals when clicking outside
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) {
+                helpModal.classList.add('hidden');
+            }
+        });
+
+        permissionModal.addEventListener('click', (e) => {
+            if (e.target === permissionModal) {
+                permissionModal.classList.add('hidden');
+            }
+        });
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCSVData();
+        });
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            } else if (!document.hidden && arPage.style.display !== 'none') {
+                startLocationTracking();
+            }
+        });
     </script>
-  </body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96be1fcdf27ab5a6',t:'MTc1NDY0Njc4MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
