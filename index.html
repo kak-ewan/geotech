@@ -1,274 +1,130 @@
-<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
-  <title>GeoTech — Location Based AR</title>
-  <!-- A-Frame & AR.js (location-based) -->
-  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-  <script src="https://unpkg.com/ar.js@3.3.2/aframe/build/aframe-ar.js"></script>
-
-  <style>
-    :root{--bg:#0f1724;--card:rgba(255,255,255,0.06);--accent:#06b6d4;--glass:rgba(255,255,255,0.06)}
-    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial}
-    body{background:linear-gradient(180deg,#071029 0%, #071a2a 100%);color:#e6eef6}
-    /* App chrome */
-    .topbar{position:fixed;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;backdrop-filter:blur(6px);background:linear-gradient(90deg, rgba(6,182,212,0.06), rgba(99,102,241,0.03));z-index:50}
-    .brand{display:flex;gap:12px;align-items:center}
-    .logo{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700}
-    .title{font-size:16px;font-weight:600}
-    .controls{display:flex;gap:8px;align-items:center}
-    .btn{background:var(--card);border:none;padding:10px 12px;border-radius:12px;color:inherit;font-weight:600}
-
-    /* List panel */
-    .panel{position:fixed;left:12px;right:12px;bottom:18px;max-height:50vh;overflow:auto;padding:12px;border-radius:14px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));box-shadow:0 8px 30px rgba(2,6,23,0.6);z-index:50}
-    .search{display:flex;gap:8px;margin-bottom:10px}
-    .search input{flex:1;padding:10px 12px;border-radius:10px;border:none;background:#0b1520;color:inherit}
-    .list{display:flex;flex-direction:column;gap:8px}
-    .place{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:rgba(255,255,255,0.02)}
-    .place .meta{display:flex;flex-direction:column}
-    .place .name{font-weight:700}
-    .muted{font-size:12px;color:rgba(230,238,246,0.7)}
-
-    /* Floating actions */
-    .fab{position:fixed;right:18px;bottom:86px;width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--accent),#7c3aed);z-index:60;box-shadow:0 10px 30px rgba(99,102,241,0.18);border:none;color:#022; font-weight:800}
-
-    /* Helpful small text */
-    .hint{position:fixed;left:12px;bottom:80px;background:var(--glass);padding:8px 10px;border-radius:10px;font-size:13px;z-index:60}
-
-    /* Responsive tweaks */
-    @media (min-width:900px){.panel{max-width:540px;left:calc(50% - 270px);right:auto}}
-
-    /* A-Frame overlay fix for camera fullscreen */
-    a-scene{width:100%;height:100vh}
-  </style>
-</head>
-<body>
-  <div class="topbar">
-    <div class="brand">
-      <div class="logo">GT</div>
-      <div>
-        <div class="title">GeoTech</div>
-        <div style="font-size:12px;color:rgba(230,238,246,0.7)">Location-based AR — buka di ponsel & izinkan kamera/lokasi</div>
-      </div>
-    </div>
-    <div class="controls">
-      <button id="locBtn" class="btn">Lokasiku</button>
-      <button id="listToggle" class="btn">Tutup List</button>
-    </div>
-  </div>
-
-  <!-- AR Scene -->
-  <a-scene vr-mode-ui="enabled: false" embedded arjs="sourceType: webcam; debugUIEnabled: false;" renderer="logarithmicDepthBuffer: true;">
-    <a-camera gps-camera="minDistance: 2; maxDistance: 10000" rotation-reader>
-      <!-- The cursor is hidden because we'll mostly use touch and raycast from camera -->
-      <a-cursor id="cursor" fuse="false" rayOrigin="mouse" visible="false"></a-cursor>
-    </a-camera>
-
-    <!-- Entities will be injected here by JS -->
-    <a-entity id="places-root"></a-entity>
-
-    <!-- ground fallback to help orientation if needed -->
-  </a-scene>
-
-  <div class="panel" id="panel">
-    <div class="search">
-      <input id="searchInput" placeholder="Cari nama tempat..." />
-      <button id="refreshBtn" class="btn">Muatt ulang</button>
-    </div>
-    <div class="list" id="placesList">
-      <div class="muted">Memuat data...</div>
-    </div>
-  </div>
-
-  <button class="fab" id="focusBtn">AR</button>
-  <div class="hint" id="hint">Jauhkan ponsel dari muka saat AR aktif untuk melihat objek di sekitar.</div>
-
-  <script>
-    // URL CSV publik (diberikan)
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCPrAyjTP4O7lSWJnouA4Ysnd5U88mcM-dWyJG0Nv9eWOA3yVKrGJ1-5G_QDdEcTNpwn0F5XbzeUJh/pub?gid=0&single=true&output=csv';
-
-    // Simple CSV parser (handles simple CSV with no quoted commas)
-    function parseCSV(text){
-      const lines = text.trim().split(/\r?\n/).filter(Boolean);
-      const rows = lines.map(l => l.split(',').map(s => s.trim()));
-      return rows;
-    }
-
-    // Haversine distance in meters
-    function haversine(lat1, lon1, lat2, lon2){
-      const toRad = v => v * Math.PI / 180;
-      const R = 6371000;
-      const dLat = toRad(lat2-lat1);
-      const dLon = toRad(lon2-lon1);
-      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-      const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R*c;
-    }
-
-    // Application state
-    let places = []; // {name, lat, lon, url, distance}
-    let userPos = null;
-
-    const placesRoot = document.getElementById('places-root');
-    const placesList = document.getElementById('placesList');
-    const searchInput = document.getElementById('searchInput');
-    const panel = document.getElementById('panel');
-    const listToggle = document.getElementById('listToggle');
-    const focusBtn = document.getElementById('focusBtn');
-    const locBtn = document.getElementById('locBtn');
-
-    // Load CSV and build places
-    async function loadPlaces(){
-      placesList.innerHTML = '<div class="muted">Memuat data...</div>';
-      try{
-        const res = await fetch(CSV_URL);
-        const txt = await res.text();
-        const rows = parseCSV(txt);
-        // Expect header or not. Normalize
-        const header = rows[0].map(h => h.toLowerCase());
-        let start = 0;
-        if (header.includes('nama') && header.includes('lat') && header.includes('long')) start = 1;
-        places = rows.slice(start).map(r => ({
-          name: r[0] || 'Unnamed',
-          lat: parseFloat(r[1]),
-          lon: parseFloat(r[2]),
-          url: r[3] || '',
-          id: Math.random().toString(36).slice(2,9)
-        })).filter(p => !isNaN(p.lat) && !isNaN(p.lon));
-
-        renderPlaces();
-      }catch(e){
-        placesList.innerHTML = '<div class="muted">Gagal memuat CSV. Periksa koneksi atau URL.</div>';
-        console.error(e);
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>GeoAR.js dengan Petunjuk Arah</title>
+    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <style>
+      .debug-panel {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: Arial;
+        z-index: 10000;
       }
-    }
-
-    // Render AR entities and list
-    function renderPlaces(filter=''){
-      // remove previous entities
-      while(placesRoot.firstChild) placesRoot.removeChild(placesRoot.firstChild);
-
-      let display = places.slice();
-      if(userPos){
-        display.forEach(p => p.distance = haversine(userPos.latitude, userPos.longitude, p.lat, p.lon));
-        display.sort((a,b)=>a.distance-b.distance);
+      .direction-arrow {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 40px;
+        color: red;
+        z-index: 10000;
       }
-      if(filter) display = display.filter(p => p.name.toLowerCase().includes(filter.toLowerCase()));
+    </style>
+  </head>
 
-      // List
-      if(display.length===0) placesList.innerHTML = '<div class="muted">Tidak ada tempat yang cocok.</div>';
-      else placesList.innerHTML = '';
+  <body style="margin: 0; overflow: hidden;">
+    <div class="direction-arrow" id="directionArrow">↑</div>
+    <div class="debug-panel" id="debugPanel">
+      <div>Mencari lokasi...</div>
+      <div id="distanceInfo">Jarak: -</div>
+      <div id="directionInfo">Arah: -</div>
+    </div>
 
-      display.forEach(p=>{
-        // LIST ITEM
-        const item = document.createElement('div'); item.className = 'place';
-        const meta = document.createElement('div'); meta.className='meta';
-        const nm = document.createElement('div'); nm.className='name'; nm.textContent = p.name;
-        const mu = document.createElement('div'); mu.className='muted'; mu.textContent = (p.distance? (p.distance>1000? (p.distance/1000).toFixed(2)+' km' : Math.round(p.distance)+' m') : 'jarak: -');
-        meta.appendChild(nm); meta.appendChild(mu);
-        const actions = document.createElement('div');
-        const btnView = document.createElement('button'); btnView.className='btn'; btnView.textContent='Tunjukkan';
-        btnView.onclick = ()=>{ focusOnPlace(p); };
-        const btnOpen = document.createElement('button'); btnOpen.className='btn'; btnOpen.textContent='Buka';
-        btnOpen.onclick = ()=>{ if(p.url) window.open(p.url, '_blank'); else alert('Tidak ada URL untuk item ini'); };
-        actions.appendChild(btnView); actions.appendChild(btnOpen);
-        item.appendChild(meta); item.appendChild(actions);
-        placesList.appendChild(item);
+    <a-scene
+      vr-mode-ui="enabled: false"
+      embedded
+      arjs="sourceType: webcam; debugUIEnabled: true;"
+    >
+      <!-- Objek target -->
+      <a-box
+        id="targetObject"
+        look-at="[gps-camera]"
+        scale="10 10 10"
+        material="color: red; opacity: 0.9;"
+        gps-entity-place="latitude: -8.6247; longitude: 116.1190;"
+      ></a-box>
+      
+      <!-- Petunjuk arah (akan dibuat secara dinamis) -->
+      <a-entity id="directionIndicator"></a-entity>
+      
+      <a-camera gps-camera rotation-reader></a-camera>
+    </a-scene>
 
-        // AR ENTITY
-        const entity = document.createElement('a-entity');
-        entity.setAttribute('gps-entity-place', `latitude: ${p.lat}; longitude: ${p.lon};`);
-        entity.setAttribute('id', 'place-'+p.id);
-        // Add a billboard: if URL points to .glb/.gltf use gltf-model, else show image or simple box
-        const url = p.url || '';
-        let child;
-        if(url.match(/\.gltf$|\.glb$/i)){
-          child = document.createElement('a-entity');
-          child.setAttribute('gltf-model', url);
-          child.setAttribute('scale', '0.5 0.5 0.5');
-          child.setAttribute('rotation', '0 180 0');
-        } else if(url.match(/\.png$|\.jpg$|\.jpeg$|\.svg$/i)){
-          child = document.createElement('a-image');
-          child.setAttribute('src', url);
-          child.setAttribute('width', '2');
-          child.setAttribute('height', '2');
-        } else {
-          // fallback: stylized box + text
-          child = document.createElement('a-entity');
-          const box = document.createElement('a-box');
-          box.setAttribute('depth','0.6'); box.setAttribute('height','0.6'); box.setAttribute('width','0.6'); box.setAttribute('material','color: #7C3AED; opacity: 0.9');
-          box.setAttribute('position','0 0.3 0');
-          const text = document.createElement('a-text');
-          text.setAttribute('value', p.name);
-          text.setAttribute('align', 'center');
-          text.setAttribute('position', '0 1 0');
-          text.setAttribute('scale','5 5 5');
-          child.appendChild(box); child.appendChild(text);
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const targetLat = -8.6247;
+        const targetLng = 116.1190;
+        let userLat, userLng;
+        let arrowElement = document.getElementById('directionArrow');
+        let distanceInfo = document.getElementById('distanceInfo');
+        let directionInfo = document.getElementById('directionInfo');
+        let debugPanel = document.getElementById('debugPanel');
+        
+        // Update posisi pengguna
+        window.addEventListener('gps-camera-update-position', function(e) {
+          userLat = e.detail.position.latitude;
+          userLng = e.detail.position.longitude;
+          
+          // Hitung jarak dan arah
+          const distance = calculateDistance(userLat, userLng, targetLat, targetLng);
+          const bearing = calculateBearing(userLat, userLng, targetLat, targetLng);
+          
+          // Update UI
+          distanceInfo.textContent = `Jarak: ${distance.toFixed(1)} meter`;
+          directionInfo.textContent = `Arah: ${bearing.toFixed(1)}° dari Utara`;
+          
+          // Putar panah petunjuk arah
+          arrowElement.style.transform = `translate(-50%, -50%) rotate(${bearing}deg)`;
+          
+          // Tampilkan debug info
+          debugPanel.innerHTML = `
+            <div>Posisi Anda: ${userLat.toFixed(6)}, ${userLng.toFixed(6)}</div>
+            <div>Target: ${targetLat.toFixed(6)}, ${targetLng.toFixed(6)}</div>
+            <div id="distanceInfo">Jarak: ${distance.toFixed(1)} meter</div>
+            <div id="directionInfo">Arah: ${bearing.toFixed(1)}° dari Utara</div>
+          `;
+        });
+        
+        // Fungsi menghitung jarak (dalam meter)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+          const R = 6371e3; // Earth radius in meters
+          const φ1 = lat1 * Math.PI/180;
+          const φ2 = lat2 * Math.PI/180;
+          const Δφ = (lat2-lat1) * Math.PI/180;
+          const Δλ = (lon2-lon1) * Math.PI/180;
+          
+          const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                   Math.cos(φ1) * Math.cos(φ2) *
+                   Math.sin(Δλ/2) * Math.sin(Δλ/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          
+          return R * c;
         }
-        // common props for child
-        child.setAttribute('look-at', '[camera]');
-        child.setAttribute('class','clickable');
-        // wire up touch/click -> open URL
-        child.addEventListener('click', ()=>{ if(p.url) window.open(p.url,'_blank'); else alert(p.name); });
-
-        entity.appendChild(child);
-        placesRoot.appendChild(entity);
+        
+        // Fungsi menghitung arah (bearing)
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+          const φ1 = lat1 * Math.PI/180;
+          const φ2 = lat2 * Math.PI/180;
+          const λ1 = lon1 * Math.PI/180;
+          const λ2 = lon2 * Math.PI/180;
+          
+          const y = Math.sin(λ2-λ1) * Math.cos(φ2);
+          const x = Math.cos(φ1)*Math.sin(φ2) -
+                    Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
+          const θ = Math.atan2(y, x);
+          
+          return (θ*180/Math.PI + 360) % 360;
+        }
       });
-    }
-
-    // Focus AR camera on selected place by briefly showing hint
-    function focusOnPlace(p){
-      alert(`Mengarahkan ke ${p.name}. Arahkan kamera ke area sekitarnya untuk melihat objek AR.`);
-      // Optionally we could add a marker or animate — keep simple for compatibility
-    }
-
-    // Track user position updates
-    function initGeolocation(){
-      if(!('geolocation' in navigator)){
-        alert('Geolocation tidak tersedia pada device ini.');
-        return;
-      }
-      navigator.geolocation.watchPosition(pos=>{
-        userPos = pos.coords;
-        if(places.length) renderPlaces(searchInput.value);
-      }, err=>{
-        console.warn('geo err', err);
-      }, {enableHighAccuracy:true, maximumAge:30000, timeout:27000});
-    }
-
-    // Rotation-reader component for a-frame to allow look-at to work reliably on mobiles
-    AFRAME.registerComponent('rotation-reader', {
-      tick: function () {
-        const rot = this.el.getAttribute('rotation');
-        // could expose or use for UI; kept intentionally light
-      }
-    });
-
-    // UI interactions
-    searchInput.addEventListener('input', ()=> renderPlaces(searchInput.value));
-    document.getElementById('refreshBtn').addEventListener('click', loadPlaces);
-    listToggle.addEventListener('click', ()=>{
-      if(panel.style.display === 'none'){ panel.style.display='block'; listToggle.textContent='Tutup List'; }
-      else { panel.style.display='none'; listToggle.textContent='Buka List'; }
-    });
-    focusBtn.addEventListener('click', ()=>{
-      // Switch focus to camera (a-scene is full screen) — hint to user
-      alert('AR view aktif — izinkan kamera & putar perangkat untuk menemukan objek.');
-    });
-    locBtn.addEventListener('click', ()=>{
-      if(userPos) alert(`Koordinatmu: ${userPos.latitude.toFixed(6)}, ${userPos.longitude.toFixed(6)}`);
-      else alert('Menunggu lokasi... izinkan akses lokasi terlebih dahulu.');
-    });
-
-    // Initialization
-    (async function(){
-      await loadPlaces();
-      initGeolocation();
-      // Improve mobile UX: offer to scroll panel up if needed
-      // Small delayed hint removal
-      setTimeout(()=>{ const h=document.getElementById('hint'); if(h) h.style.display='none'; }, 9000);
-    })();
-  </script>
-</body>
+    </script>
+  </body>
 </html>
